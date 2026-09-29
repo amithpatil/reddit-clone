@@ -1,0 +1,33 @@
+server:
+  port: 8081   # 8080 is occupied by an unrelated process on this machine
+
+spring:
+  application:
+    name: reddit-clone
+  datasource:
+    url: jdbc:postgresql://localhost:6432/redditclone   # app traffic -> PgBouncer
+    username: app
+    password: devpassword
+  flyway:
+    url: jdbc:postgresql://localhost:5434/redditclone    # migrations -> Postgres directly, bypassing PgBouncer (host port 5434, see docker-compose.yml)
+    user: app
+    password: devpassword
+  jpa:
+    hibernate:
+      ddl-auto: validate   # Flyway owns the schema, not Hibernate
+    open-in-view: false
+  data:
+    redis:
+      host: localhost
+      port: 6380
+
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-change-me-32-bytes-minimum!}
+    access-ttl-minutes: 15
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health

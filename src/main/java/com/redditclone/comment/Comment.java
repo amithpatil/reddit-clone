@@ -1,0 +1,146 @@
+package com.redditclone.comment;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnTransformer;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "comments")
+public class Comment {
+
+    @Id
+    private UUID id;
+
+    @Column(name = "post_id", nullable = false)
+    private UUID postId;
+
+    @Column(name = "parent_id")
+    private UUID parentId; // null = top-level
+
+    // ltree labels only allow [A-Za-z0-9_] — CommentService strips a UUID's hyphens before using it as a
+    // path label. Two things had to be verified against a live insert, not assumed from the doc's snippet:
+    // (1) @JdbcTypeCode(SqlTypes.OTHER) binds via setObject(Types.OTHER), which pgjdbc sends as `bytea`
+    // over the wire regardless of INSERT vs SELECT context ("column path is of type ltree but expression
+    // is of type bytea") — same failure citext hit, fixed the same way (plain String, columnDefinition
+    // only, no JdbcTypeCode). (2) Unlike citext, ltree has no implicit/assignment cast from varchar
+    // ("...but expression is of type character varying"), so plain String binding alone still isn't
+    // enough — @ColumnTransformer's write expression wraps the bind parameter in an explicit ::ltree cast,
+    // which Postgres accepts.
+    @ColumnTransformer(write = "?::ltree")
+    @Column(nullable = false, columnDefinition = "ltree")
+    private String path;
+
+    @Column(nullable = false)
+    private short depth;
+
+    @Column(name = "author_id", nullable = false)
+    private UUID authorId;
+
+    @Column(nullable = false)
+    private String body;
+
+    @Column(nullable = false)
+    private int score = 0;
+
+    @Column(name = "child_count", nullable = false)
+    private int childCount = 0;
+
+    @Column(nullable = false)
+    private boolean removed;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt = Instant.now();
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public UUID getPostId() {
+        return postId;
+    }
+
+    public void setPostId(UUID postId) {
+        this.postId = postId;
+    }
+
+    public UUID getParentId() {
+        return parentId;
+    }
+
+    public void setParentId(UUID parentId) {
+        this.parentId = parentId;
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public void setPath(String path) {
+        this.path = path;
+    }
+
+    public short getDepth() {
+        return depth;
+    }
+
+    public void setDepth(short depth) {
+        this.depth = depth;
+    }
+
+    public UUID getAuthorId() {
+        return authorId;
+    }
+
+    public void setAuthorId(UUID authorId) {
+        this.authorId = authorId;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public void setBody(String body) {
+        this.body = body;
+    }
+
+    public int getScore() {
+        return score;
+    }
+
+    public void setScore(int score) {
+        this.score = score;
+    }
+
+    public int getChildCount() {
+        return childCount;
+    }
+
+    public void setChildCount(int childCount) {
+        this.childCount = childCount;
+    }
+
+    public boolean isRemoved() {
+        return removed;
+    }
+
+    public void setRemoved(boolean removed) {
+        this.removed = removed;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+}

@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_DB: redditclone
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: devpassword
+    ports: ["5434:5432"]   # 5432 is taken by a native Postgres process on this machine
+    volumes: ["pgdata:/var/lib/postgresql"]   # postgres:18 images store data under the parent dir, not /data (pg_ctlcluster-compatible layout)
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d redditclone"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+  redis:
+    image: redis:8
+    ports: ["6380:6379"]   # 6379 is taken by another project's Redis container on this machine
+  pgbouncer:
+    image: edoburu/pgbouncer
+    environment:
+      DATABASE_URL: postgres://app:devpassword@postgres:5432/redditclone
+      POOL_MODE: session
+      LISTEN_PORT: 6432   # image defaults to listening on 5432 internally; make it match the published port
+      AUTH_TYPE: scram-sha-256   # postgres:18 defaults password_encryption to scram-sha-256; the image's md5 default fails backend auth against it
+    ports: ["6432:6432"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+volumes:
+  pgdata:
