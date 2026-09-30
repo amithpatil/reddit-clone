@@ -42,12 +42,16 @@ public class SecurityConfig {
                         .requestMatchers("/api/v1/register", "/api/v1/access_token", "/api/v1/access_token/refresh")
                         .permitAll()
                         // Reddit's real API lets anyone browse without a token — only actions (vote, submit,
-                        // comment, subscribe, save, message, delete) require one. jwtFilter still runs on these
+                        // comment, subscribe, save, chat, delete) require one. jwtFilter still runs on these
                         // and populates the principal when a token IS present.
                         .requestMatchers(HttpMethod.GET, "/r/*/new", "/r/*/hot", "/r/*/top", "/r/*/rising",
                                 "/r/*/controversial", "/r/*/search", "/r/*/comments/*", "/user/*/about", "/r/*/flairs")
                         .permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // The WebSocket handshake is a plain HTTP GET that a browser-native WebSocket
+                        // client cannot attach an Authorization header to — real auth happens one layer up,
+                        // at the first STOMP frame (see ChatWebSocketConfig's inbound-channel interceptor).
+                        .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

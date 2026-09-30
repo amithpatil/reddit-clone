@@ -133,6 +133,16 @@ public class AuthService {
                 .collect(Collectors.toMap(User::getUsername, User::getId));
     }
 
+    // Reverse of findUserIdsByUsernames — read by chat.ChatService to render a room summary's other-
+    // participant usernames without chat reaching into auth.UserRepository directly.
+    public Map<UUID, String> findUsernamesByIds(Set<UUID> userIds) {
+        if (userIds.isEmpty()) {
+            return Map.of();
+        }
+        return users.findAllById(userIds).stream()
+                .collect(Collectors.toMap(User::getId, User::getUsername));
+    }
+
     // Read by community.CommunityService's permission checks so a deleted/banned account's still-valid
     // access token can't keep exercising moderator/site-admin authority for the remainder of its TTL —
     // deleteAccount() anonymizes the row but never touches community_moderators/is_site_admin directly.

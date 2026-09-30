@@ -63,6 +63,12 @@
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-webmvc</artifactId>
 		</dependency>
+		<!-- chat module: STOMP-over-WebSocket real-time messaging (pulls in spring-messaging +
+			 spring-websocket transitively). -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-websocket</artifactId>
+		</dependency>
 		<!-- Spring Boot 4 splits Jackson out of spring-boot-starter-webmvc into its own starter (unlike
 			 Boot 3's bundled spring-boot-starter-json) — jjwt-jackson only pulls jackson-databind in at
 			 runtime scope, which isn't enough to compile against ObjectMapper directly (vote/VoteService,

@@ -1,0 +1,65 @@
+package com.redditclone.chat;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "chat_messages")
+public class ChatMessage {
+
+    @Id
+    private UUID id;
+
+    @Column(name = "room_id", nullable = false)
+    private UUID roomId;
+
+    @Column(name = "sender_id", nullable = false)
+    private UUID senderId;
+
+    @Column(nullable = false)
+    private String body;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt = Instant.now();
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public UUID getRoomId() {
+        return roomId;
+    }
+
+    public void setRoomId(UUID roomId) {
+        this.roomId = roomId;
+    }
+
+    public UUID getSenderId() {
+        return senderId;
+    }
+
+    public void setSenderId(UUID senderId) {
+        this.senderId = senderId;
+    }
+
+    public String getBody() {
+        return body;
+    }
+
+    public void setBody(String body) {
+        this.body = body;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+}

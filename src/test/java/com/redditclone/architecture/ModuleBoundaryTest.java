@@ -48,8 +48,8 @@ class ModuleBoundaryTest {
             repositoryAccessRule("..notify..");
 
     @ArchTest
-    static final ArchRule message_repositories_are_only_accessed_within_message =
-            repositoryAccessRule("..message..");
+    static final ArchRule chat_repositories_are_only_accessed_within_chat =
+            repositoryAccessRule("..chat..");
 
     @ArchTest
     static final ArchRule engagement_repositories_are_only_accessed_within_engagement =

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Seeds a small dataset through the live Phase 4 REST API (never direct SQL for content creation, same
-# rule as Phase 1-3's scripts) and re-verifies notifications/messaging/saved+hidden items/media
-# uploads/account settings & deletion end to end: reply/mention notification fan-out via the outbox
-# worker (including the notifications-table partition fix — this is the same bug class already found in
-# reports/moderation_actions, so the very first insert here is itself a regression check), self-
-# notification suppression, mark-read, inbox merge, save/unsave and hide/unhide for both posts and
-# comments with per-viewer scoping (including the unauthenticated-request bypass), account prefs
+# rule as Phase 1-3's scripts) and re-verifies notifications/saved+hidden items/media uploads/account
+# settings & deletion end to end: reply/mention notification fan-out via the outbox worker (including the
+# notifications-table partition fix — this is the same bug class already found in reports/
+# moderation_actions, so the very first insert here is itself a regression check), self-notification
+# suppression, mark-read, save/unsave and hide/unhide for both posts and comments with per-viewer scoping
+# (including the unauthenticated-request bypass), account prefs
 # get/patch, account deletion (wrong-password rejection, anonymization, post-deletion login rejection),
 # the full media pipeline (presigned upload -> real PUT -> complete -> async processing -> attached media
 # view on post reads) for both an image and a real small video, kind-conditional post validation,
@@ -136,17 +136,6 @@ req POST "/api/notifications/$NOTIF_ID/read" "" -H "Authorization: Bearer $OWNER
 expect_status "mark notification read" "200" "$HTTP_STATUS" "-"
 READ_AT=$(psql_c "SELECT read_at IS NOT NULL FROM notifications WHERE id='$NOTIF_ID'")
 expect_eq "notification's read_at is set after marking read" "t" "$READ_AT"
-
-################################################################################
-echo "=== Phase C: messages + inbox merge ==="
-################################################################################
-
-req POST /api/compose "{\"recipientUsername\":\"p4${RUN}owner\",\"subject\":\"hi\",\"body\":\"hello there\"}" -H "Authorization: Bearer $COMMENTER"
-expect_status "compose a message" "200" "$HTTP_STATUS" "body=$HTTP_BODY"
-
-req GET /message/inbox "" -H "Authorization: Bearer $OWNER"
-INBOX_KINDS=$(echo "$HTTP_BODY" | jq -r '[.[].kind] | unique | sort | join(",")')
-expect_eq "inbox interleaves messages and notifications" "message,notification" "$INBOX_KINDS"
 
 ################################################################################
 echo "=== Phase D: saved/hidden items, per-viewer scoping (posts and comments) ==="
