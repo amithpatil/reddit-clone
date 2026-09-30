@@ -41,6 +41,9 @@ public class AuthService {
         if (users.existsByEmail(email)) {
             throw new ConflictException("email in use");
         }
+        if (users.existsByUsername(username)) {
+            throw new ConflictException("username in use");
+        }
         User user = new User();
         user.setId(ids.nextId());
         user.setUsername(username);
@@ -73,9 +76,13 @@ public class AuthService {
             refreshTokens.revokeFamily(stored.getFamilyId()); // reuse of a dead token = theft signal
             throw new UnauthorizedException("token reuse detected");
         }
+        if (stored.getExpiresAt().isBefore(Instant.now())) {
+            throw new UnauthorizedException("refresh token expired");
+        }
         stored.setRevokedAt(Instant.now());
         refreshTokens.save(stored);
-        User user = users.findById(stored.getUserId()).orElseThrow();
+        User user = users.findById(stored.getUserId())
+                .orElseThrow(() -> new UnauthorizedException("invalid refresh token"));
         return issueTokens(user, stored.getFamilyId());
     }
 

@@ -3,6 +3,8 @@ package com.redditclone.comment;
 import com.redditclone.comment.dto.CommentView;
 import com.redditclone.comment.dto.PostWithCommentsView;
 import com.redditclone.comment.dto.ReplyRequest;
+import com.redditclone.common.exception.NotFoundException;
+import com.redditclone.community.CommunityService;
 import com.redditclone.post.PostService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,10 +22,12 @@ public class CommentController {
 
     private final CommentService commentService;
     private final PostService postService;
+    private final CommunityService communityService;
 
-    public CommentController(CommentService commentService, PostService postService) {
+    public CommentController(CommentService commentService, PostService postService, CommunityService communityService) {
         this.commentService = commentService;
         this.postService = postService;
+        this.communityService = communityService;
     }
 
     // API design lists comment creation as POST /api/comment (postId/parentId in the body); the class
@@ -36,7 +40,14 @@ public class CommentController {
 
     @GetMapping("/r/{communityName}/comments/{postId}")
     public PostWithCommentsView getPostWithComments(@PathVariable String communityName, @PathVariable UUID postId) {
+        UUID communityId = communityService.findByName(communityName).getId();
         var post = postService.findById(postId);
+        // The URL's communityName must actually own this post, and a removed post is hidden here the
+        // same way it's hidden from /new — otherwise the community segment is decorative and "removed"
+        // content stays readable by ID.
+        if (post.isRemoved() || !post.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("post not found");
+        }
         var comments = commentService.findTopLevel(postId).stream().map(CommentView::from).toList();
         return new PostWithCommentsView(post, comments);
     }

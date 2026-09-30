@@ -4,6 +4,7 @@ import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
+import com.redditclone.post.PostService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,17 +19,20 @@ public class CommentService {
     private static final int TOP_LEVEL_PAGE_SIZE = 50;
 
     private final CommentRepository comments;
+    private final PostService postService;
     private final UuidV7Generator ids;
     private final Sanitizer sanitizer;
 
-    public CommentService(CommentRepository comments, UuidV7Generator ids, Sanitizer sanitizer) {
+    public CommentService(CommentRepository comments, PostService postService, UuidV7Generator ids, Sanitizer sanitizer) {
         this.comments = comments;
+        this.postService = postService;
         this.ids = ids;
         this.sanitizer = sanitizer;
     }
 
     @Transactional
     public Comment reply(UUID authorId, UUID postId, UUID parentId, String body) {
+        postService.findById(postId); // 404s on a nonexistent/deleted post instead of creating an orphan
         Comment c = new Comment();
         c.setId(ids.nextId());
         c.setPostId(postId);
@@ -42,6 +46,9 @@ public class CommentService {
         } else {
             Comment parent = comments.findById(parentId)
                     .orElseThrow(() -> new NotFoundException("parent comment not found"));
+            if (!parent.getPostId().equals(postId)) {
+                throw new BadRequestException("parent comment does not belong to this post");
+            }
             if (parent.getDepth() >= MAX_DEPTH) {
                 throw new BadRequestException("max comment depth reached");
             }
@@ -49,7 +56,9 @@ public class CommentService {
             c.setPath(parent.getPath() + "." + toLabel(c.getId()));
             comments.incrementChildCount(parentId);
         }
-        return comments.save(c);
+        Comment saved = comments.save(c);
+        postService.incrementCommentCount(postId);
+        return saved;
     }
 
     public List<Comment> findTopLevel(UUID postId) {

@@ -32,22 +32,24 @@ public class PostService {
     @Transactional
     public Post create(UUID authorId, UUID communityId, CreatePostRequest req, String idempotencyKey) {
         String key = "idempotency:" + authorId + ":" + idempotencyKey;
-        String existingPostId = redis.opsForValue().get(key);
-        if (existingPostId != null) {
+        UUID newId = ids.nextId();
+        // Claim the key BEFORE inserting (SETNX-first), not after: a GET-then-insert-then-SETNX order
+        // leaves a window where two concurrent requests both see no existing key and both insert a row.
+        Boolean claimed = redis.opsForValue().setIfAbsent(key, newId.toString(), Duration.ofHours(24));
+        if (!Boolean.TRUE.equals(claimed)) {
+            String existingPostId = redis.opsForValue().get(key);
             return posts.findById(UUID.fromString(existingPostId))
                     .orElseThrow(() -> new NotFoundException("post not found"));
         }
         Post p = new Post();
-        p.setId(ids.nextId());
+        p.setId(newId);
         p.setCommunityId(communityId);
         p.setAuthorId(authorId);
         p.setKind(req.kind());
-        p.setTitle(req.title());
+        p.setTitle(sanitizer.sanitize(req.title()));
         p.setBody(sanitizer.sanitize(req.body()));
         p.setUrl(req.url());
         posts.save(p);
-        // SETNX so a concurrent retry can't race past the check above; 24h TTL is generous for a client retry window.
-        redis.opsForValue().setIfAbsent(key, p.getId().toString(), Duration.ofHours(24));
         return p;
     }
 
@@ -57,5 +59,9 @@ public class PostService {
 
     public Post findById(UUID postId) {
         return posts.findById(postId).orElseThrow(() -> new NotFoundException("post not found"));
+    }
+
+    public void incrementCommentCount(UUID postId) {
+        posts.incrementCommentCount(postId);
     }
 }

@@ -10,7 +10,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // No IgnoreCase here: username/email are citext columns, already case-insensitive at the DB level.
     // Spring Data's IgnoreCase wraps the comparison in Hibernate's upper() HQL function, which rejects a
     // citext-mapped (JdbcTypeCode SqlTypes.OTHER) argument — plain equality is both correct and simpler.
+    // (Case-insensitivity of plain equality itself depends on stringtype=unspecified on the JDBC URL —
+    // see application.yml.)
     boolean existsByEmail(String email);
+
+    boolean existsByUsername(String username);
 
     Optional<User> findByUsername(String username);
 }

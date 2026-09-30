@@ -124,9 +124,9 @@ public class Comment {
         return childCount;
     }
 
-    public void setChildCount(int childCount) {
-        this.childCount = childCount;
-    }
+    // No setter: childCount is exclusively mutated via CommentRepository.incrementChildCount's atomic
+    // bulk UPDATE. A setter here would invite calling it on a stale loaded entity and silently
+    // clobbering that update on the next dirty-checking flush.
 
     public boolean isRemoved() {
         return removed;

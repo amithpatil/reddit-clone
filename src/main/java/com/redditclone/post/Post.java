@@ -145,9 +145,8 @@ public class Post {
         return commentCount;
     }
 
-    public void setCommentCount(int commentCount) {
-        this.commentCount = commentCount;
-    }
+    // No setter: commentCount is exclusively mutated via PostRepository.incrementCommentCount's atomic
+    // bulk UPDATE, same reasoning as Comment.childCount.
 
     public double getHotRank() {
         return hotRank;

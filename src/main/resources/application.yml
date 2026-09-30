@@ -5,7 +5,14 @@ spring:
   application:
     name: reddit-clone
   datasource:
-    url: jdbc:postgresql://localhost:6432/redditclone   # app traffic -> PgBouncer
+    # stringtype=unspecified: without it, pgjdbc binds every String parameter as a concrete varchar,
+    # which Postgres then compares against a citext column by casting the COLUMN down to text
+    # (case-sensitive) instead of casting the parameter up to citext — silently breaking case-
+    # insensitive matching on existsByEmail/findByUsername/findByName even though the citext UNIQUE
+    # constraint itself still folds case correctly. Verified directly against Postgres (psql PREPARE)
+    # that an unspecified-type parameter restores case-insensitive comparison. This is pgjdbc's own
+    # documented fix for exactly this class of problem (citext, enums, and other extension types).
+    url: jdbc:postgresql://localhost:6432/redditclone?stringtype=unspecified   # app traffic -> PgBouncer
     username: app
     password: devpassword
   flyway:

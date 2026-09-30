@@ -13,6 +13,8 @@ public interface CommunityRepository extends JpaRepository<Community, UUID> {
     // IgnoreCase itself (Hibernate's upper() HQL function) is incompatible with a citext-mapped column.
     Optional<Community> findByName(String name);
 
+    boolean existsByName(String name);
+
     @Modifying
     @Query("UPDATE Community c SET c.subscriberCount = c.subscriberCount + 1 WHERE c.id = :id")
     void incrementSubscriberCount(UUID id);

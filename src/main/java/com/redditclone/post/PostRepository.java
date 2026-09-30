@@ -2,6 +2,7 @@ package com.redditclone.post;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -21,4 +22,8 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
                             @Param("cursorCreatedAt") Instant cursorCreatedAt,
                             @Param("cursorId") UUID cursorId,
                             Pageable limit);
+
+    @Modifying
+    @Query("UPDATE Post p SET p.commentCount = p.commentCount + 1 WHERE p.id = :id")
+    void incrementCommentCount(@Param("id") UUID id);
 }

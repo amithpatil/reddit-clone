@@ -1,10 +1,12 @@
 package com.redditclone.common.exception;
 
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.sql.SQLException;
 import java.time.Instant;
 import java.util.Map;
 
@@ -29,6 +31,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<Object> handleBadRequest(BadRequestException ex) {
         return body(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    // Safety net behind the service-layer existence pre-checks (email/username in AuthService,
+    // community name in CommunityService): two concurrent requests can both pass a pre-check before
+    // either commits, so the DB's UNIQUE constraint is still the actual source of truth. Without this,
+    // that race surfaces as a raw 500 instead of the same 409 the pre-check gives the common case.
+    //
+    // DataIntegrityViolationException also covers CHECK/NOT-NULL/FK violations, which are not
+    // conflicts — e.g. a comment body that expands past the 10000-char CHECK constraint after HTML
+    // sanitization. Only Postgres's unique_violation SQLState (23505) maps to 409; everything else
+    // is a client-input problem this app has no other way to have caused, so it maps to 400.
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<Object> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        Throwable cause = ex.getMostSpecificCause();
+        if (cause instanceof SQLException sqlEx && "23505".equals(sqlEx.getSQLState())) {
+            return body(HttpStatus.CONFLICT, "resource already exists");
+        }
+        return body(HttpStatus.BAD_REQUEST, "invalid request");
     }
 
     private ResponseEntity<Object> body(HttpStatus status, String message) {

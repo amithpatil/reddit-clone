@@ -23,17 +23,22 @@ public final class CursorCodec {
         }
         try {
             String decoded = new String(Base64.getUrlDecoder().decode(after), StandardCharsets.UTF_8);
-            int sep = decoded.indexOf(':');
-            long epochMillis = Long.parseLong(decoded.substring(0, sep));
-            UUID id = UUID.fromString(decoded.substring(sep + 1));
-            return new Cursor(Instant.ofEpochMilli(epochMillis), id);
+            // epochSecond:nanoAdjustment:uuid — see encode() for why this isn't epochMillis.
+            String[] parts = decoded.split(":", 3);
+            Instant createdAt = Instant.ofEpochSecond(Long.parseLong(parts[0]), Long.parseLong(parts[1]));
+            UUID id = UUID.fromString(parts[2]);
+            return new Cursor(createdAt, id);
         } catch (Exception e) {
             throw new BadRequestException("invalid cursor");
         }
     }
 
+    // epochSecond+nano rather than toEpochMilli(): the latter truncates to millisecond precision, but
+    // posts.created_at is a microsecond-precision TIMESTAMPTZ, so a millis-truncated cursor can compare
+    // as neither "<" nor "=" against a row whose true timestamp falls in the truncated sub-millisecond
+    // gap — silently and permanently skipping that row on every later page.
     public static String encode(Instant createdAt, UUID id) {
-        String raw = createdAt.toEpochMilli() + ":" + id;
+        String raw = createdAt.getEpochSecond() + ":" + createdAt.getNano() + ":" + id;
         return Base64.getUrlEncoder().withoutPadding().encodeToString(raw.getBytes(StandardCharsets.UTF_8));
     }
 }
