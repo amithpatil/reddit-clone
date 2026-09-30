@@ -7,6 +7,8 @@ import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.VoteDelta;
 import com.redditclone.post.PostService;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -25,24 +27,22 @@ import java.util.UUID;
 @Component
 public class OutboxWorker {
 
+    private static final Logger log = LoggerFactory.getLogger(OutboxWorker.class);
     private static final int BATCH_SIZE = 500;
 
     private final JdbcTemplate jdbc;
     private final PostService postService;
     private final CommentService commentService;
     private final AuthService authService;
-    private final KarmaLogRepository karmaLog;
     private final UuidV7Generator ids;
     private final ObjectMapper json;
 
     public OutboxWorker(JdbcTemplate jdbc, PostService postService, CommentService commentService,
-                         AuthService authService, KarmaLogRepository karmaLog, UuidV7Generator ids,
-                         ObjectMapper json) {
+                         AuthService authService, UuidV7Generator ids, ObjectMapper json) {
         this.jdbc = jdbc;
         this.postService = postService;
         this.commentService = commentService;
         this.authService = authService;
-        this.karmaLog = karmaLog;
         this.ids = ids;
         this.json = json;
     }
@@ -64,17 +64,28 @@ public class OutboxWorker {
 
         // Grouping by target id before writing means many votes on the same post/comment in one tick
         // become one UPDATE, not one per vote — see Voting, karma & outbox in the source plan.
-        Map<UUID, int[]> postAgg = new HashMap<>(); // {scoreDelta, upsDelta, downsDelta, eventCount}
+        Map<UUID, int[]> postAgg = new HashMap<>(); // {scoreDelta, upsDelta, downsDelta}
         Map<UUID, int[]> commentAgg = new HashMap<>();
 
+        // Each event is isolated in its own try/catch: without this, one unparseable payload throws out
+        // of the loop and rolls back the whole @Transactional batch, including every valid event in it —
+        // and since none of them get marked processed_at, the next tick re-selects the identical batch
+        // (same ORDER BY id LIMIT) and hits the same bad row again, forever. A bad event is logged and
+        // left for the operator to investigate instead of blocking the rest of the queue.
         for (Map<String, Object> event : events) {
             String type = (String) event.get("event_type");
-            VoteEventPayload payload = parsePayload(event.get("payload").toString());
-            int[] delta = computeDelta(payload);
-            if (type.startsWith("post_vote")) {
-                accumulate(postAgg, payload.targetId(), delta);
-            } else if (type.startsWith("comment_vote")) {
-                accumulate(commentAgg, payload.targetId(), delta);
+            try {
+                VoteEventPayload payload = parsePayload(event.get("payload").toString());
+                int[] delta = computeDelta(payload);
+                if (type.startsWith("post_vote")) {
+                    accumulate(postAgg, payload.targetId(), delta);
+                } else if (type.startsWith("comment_vote")) {
+                    accumulate(commentAgg, payload.targetId(), delta);
+                } else {
+                    log.warn("outbox event {} has unrecognized event_type '{}', marking processed without applying it", event.get("id"), type);
+                }
+            } catch (Exception e) {
+                log.warn("outbox event {} could not be applied, marking processed without applying it: {}", event.get("id"), e.getMessage());
             }
         }
 
@@ -108,36 +119,36 @@ public class OutboxWorker {
         int scoreDelta = newDir - oldDir;
         int upsDelta = (newDir == 1 ? 1 : 0) - (oldDir == 1 ? 1 : 0);
         int downsDelta = (newDir == -1 ? 1 : 0) - (oldDir == -1 ? 1 : 0);
-        return new int[]{scoreDelta, upsDelta, downsDelta, 1};
+        return new int[]{scoreDelta, upsDelta, downsDelta};
     }
 
     private void accumulate(Map<UUID, int[]> agg, UUID targetId, int[] delta) {
-        agg.merge(targetId, delta, (a, b) -> new int[]{a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]});
+        agg.merge(targetId, delta, (a, b) -> new int[]{a[0] + b[0], a[1] + b[1], a[2] + b[2]});
     }
 
     private Map<UUID, VoteDelta> toVoteDeltas(Map<UUID, int[]> agg) {
         Map<UUID, VoteDelta> out = new HashMap<>();
-        agg.forEach((id, d) -> out.put(id, new VoteDelta(d[0], d[1], d[2], d[3])));
+        agg.forEach((id, d) -> out.put(id, new VoteDelta(d[0], d[1], d[2])));
         return out;
     }
 
-    // One karma_log row per post/comment that actually changed (append-only audit ledger), plus one
-    // grouped users.karma_post/karma_comment UPDATE per distinct author — not one UPDATE per row, in
-    // case a single batch touches several posts by the same author.
+    // One karma_log row per post/comment that actually changed (append-only audit ledger, via a single
+    // batched INSERT rather than one JPA save() per row — KarmaLog's id is a manually-assigned UUID with
+    // no @GeneratedValue, so a JPA save() on it resolves to merge(), issuing a spurious SELECT-by-PK
+    // before every INSERT), plus one grouped users.karma_post/karma_comment UPDATE per distinct author —
+    // not one UPDATE per row, in case a single batch touches several posts by the same author.
     private void applyKarma(List<KarmaEvent> events, String reason, boolean isPost) {
         if (events.isEmpty()) {
             return;
         }
+        List<Object[]> rows = events.stream()
+                .map(e -> new Object[]{ids.nextId(), e.userId(), e.delta(), reason, e.sourceId()})
+                .toList();
+        jdbc.batchUpdate("INSERT INTO karma_log (id, user_id, delta, reason, source_id) VALUES (?, ?, ?, ?, ?)", rows);
+
         Map<UUID, Integer> byUser = new HashMap<>();
         for (KarmaEvent e : events) {
             byUser.merge(e.userId(), e.delta(), Integer::sum);
-            KarmaLog log = new KarmaLog();
-            log.setId(ids.nextId());
-            log.setUserId(e.userId());
-            log.setDelta(e.delta());
-            log.setReason(reason);
-            log.setSourceId(e.sourceId());
-            karmaLog.save(log);
         }
         byUser.forEach((userId, delta) -> {
             if (isPost) {

@@ -21,11 +21,14 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     Optional<User> findByUsername(String username);
 
-    @Modifying
+    // clearAutomatically: same reasoning as CommentRepository.incrementChildCount — without it, a User
+    // entity already loaded in this transaction would keep its stale pre-update karma in the persistence
+    // context, and a later save of that entity would silently clobber this bulk update.
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE User u SET u.karmaPost = u.karmaPost + :delta WHERE u.id = :id")
     void adjustKarmaPost(@Param("id") UUID id, @Param("delta") int delta);
 
-    @Modifying
+    @Modifying(clearAutomatically = true)
     @Query("UPDATE User u SET u.karmaComment = u.karmaComment + :delta WHERE u.id = :id")
     void adjustKarmaComment(@Param("id") UUID id, @Param("delta") int delta);
 }

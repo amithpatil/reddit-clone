@@ -66,49 +66,55 @@ public class PostController {
     public Listing<Post> listHot(@PathVariable String communityName,
                                   @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
-        RankCursor cursor = RankCursorCodec.decode(after);
+        RankCursor cursor = RankCursorCodec.decode(after, "hot");
         List<Post> page = postService.findHotPage(communityId, cursor.rank(), cursor.id(), PAGE_SIZE);
-        return rankListing(page, Post::getHotRank);
+        return rankListing("hot", page, Post::getHotRank, null);
     }
 
-    // t = hour|day|week|month|year|all (default all), matching Reddit's own /top query param.
+    // t = hour|day|week|month|year|all (default all), matching Reddit's own /top query param. The cutoff
+    // is anchored to the instant page 1 was requested and carried forward in the cursor (see RankCursor's
+    // anchorEpochSecond) rather than recomputed from Instant.now() on every page — otherwise a client
+    // paging over several minutes gets a moving window that can skip or duplicate rows at the boundary.
     @GetMapping("/top")
     public Listing<Post> listTop(@PathVariable String communityName,
                                   @RequestParam(required = false) String after,
                                   @RequestParam(name = "t", required = false, defaultValue = "all") String period) {
         UUID communityId = communityService.findByName(communityName).getId();
-        RankCursor cursor = RankCursorCodec.decode(after);
-        Instant since = periodCutoff(period);
+        RankCursor cursor = RankCursorCodec.decode(after, "top");
+        Instant anchor = cursor.anchorEpochSecond() != null
+                ? Instant.ofEpochSecond(cursor.anchorEpochSecond())
+                : Instant.now();
+        Instant since = periodCutoff(period, anchor);
         List<Post> page = postService.findTopPage(communityId, since, cursor.rank(), cursor.id(), PAGE_SIZE);
-        return rankListing(page, p -> (double) p.getScore());
+        return rankListing("top", page, p -> (double) p.getScore(), anchor.getEpochSecond());
     }
 
     @GetMapping("/rising")
     public Listing<Post> listRising(@PathVariable String communityName,
                                      @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
-        RankCursor cursor = RankCursorCodec.decode(after);
+        RankCursor cursor = RankCursorCodec.decode(after, "rising");
         List<Post> page = postService.findRisingPage(communityId, cursor.rank(), cursor.id(), PAGE_SIZE);
-        return rankListing(page, Post::getRisingRank);
+        return rankListing("rising", page, Post::getRisingRank, null);
     }
 
     @GetMapping("/controversial")
     public Listing<Post> listControversial(@PathVariable String communityName,
                                             @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
-        RankCursor cursor = RankCursorCodec.decode(after);
+        RankCursor cursor = RankCursorCodec.decode(after, "controversial");
         List<Post> page = postService.findControversialPage(communityId, cursor.rank(), cursor.id(), PAGE_SIZE);
-        return rankListing(page, Post::getControversialRank);
+        return rankListing("controversial", page, Post::getControversialRank, null);
     }
 
-    private Listing<Post> rankListing(List<Post> page, ToDoubleFunction<Post> rankOf) {
+    private Listing<Post> rankListing(String sort, List<Post> page, ToDoubleFunction<Post> rankOf, Long anchorEpochSecond) {
         List<Thing<Post>> children = page.stream().map(p -> new Thing<>(POST_KIND, p)).toList();
         String next = page.isEmpty() ? null
-                : RankCursorCodec.encode(rankOf.applyAsDouble(page.getLast()), page.getLast().getId());
+                : RankCursorCodec.encode(sort, rankOf.applyAsDouble(page.getLast()), page.getLast().getId(), anchorEpochSecond);
         return Listing.of(children, next);
     }
 
-    private Instant periodCutoff(String period) {
+    private Instant periodCutoff(String period, Instant anchor) {
         Duration window = switch (period) {
             case "hour" -> Duration.ofHours(1);
             case "day" -> Duration.ofDays(1);
@@ -118,6 +124,6 @@ public class PostController {
             case "all" -> null;
             default -> throw new BadRequestException("invalid period");
         };
-        return window == null ? Instant.EPOCH : Instant.now().minus(window);
+        return window == null ? Instant.EPOCH : anchor.minus(window);
     }
 }

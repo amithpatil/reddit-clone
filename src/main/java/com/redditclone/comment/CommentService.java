@@ -77,6 +77,10 @@ public class CommentService {
         return comments.findTopLevel(postId, Pageable.ofSize(TOP_LEVEL_PAGE_SIZE));
     }
 
+    public Comment findById(UUID commentId) {
+        return comments.findById(commentId).orElseThrow(() -> new NotFoundException("comment not found"));
+    }
+
     // Applies a batch of grouped vote deltas (one entry per comment touched, not per vote — see
     // OutboxWorker) via raw SQL bulk updates rather than loading Comment entities: avoids the same
     // stale-persistence-context class of bug incrementChildCount's clearAutomatically works around, and

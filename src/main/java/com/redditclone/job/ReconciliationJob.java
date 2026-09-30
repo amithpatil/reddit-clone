@@ -9,6 +9,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+
 // Nightly integrity sweep for the tables that intentionally skip DB-level foreign keys (Data model —
 // Resolved design decisions, "Foreign keys"): post_votes, comment_votes, comments.
 @Component
@@ -17,11 +20,20 @@ public class ReconciliationJob {
     private static final Logger log = LoggerFactory.getLogger(ReconciliationJob.class);
 
     private final JdbcTemplate jdbc;
-    private final MeterRegistry meterRegistry;
+
+    // MeterRegistry.gauge(name, Number) only registers a meter once per name and holds a weak reference
+    // to the Number passed in — calling it again with a fresh boxed int/Long each run doesn't rebind the
+    // gauge, so the exported value freezes at the first run's count (or goes NaN once that box is GC'd).
+    // Backing the gauge with a field-level Atomic*, registered once and mutated in place, keeps it live.
+    private final AtomicInteger orphanPostVotesGauge = new AtomicInteger();
+    private final AtomicInteger orphanCommentVotesGauge = new AtomicInteger();
+    private final AtomicLong orphanCommentsGauge = new AtomicLong();
 
     public ReconciliationJob(JdbcTemplate jdbc, MeterRegistry meterRegistry) {
         this.jdbc = jdbc;
-        this.meterRegistry = meterRegistry;
+        meterRegistry.gauge("reconciliation.orphan_post_votes_removed", orphanPostVotesGauge);
+        meterRegistry.gauge("reconciliation.orphan_comment_votes_removed", orphanCommentVotesGauge);
+        meterRegistry.gauge("reconciliation.orphan_comments_found", orphanCommentsGauge);
     }
 
     @Scheduled(cron = "0 30 3 * * *") // 03:30 server time, off-peak
@@ -41,9 +53,9 @@ public class ReconciliationJob {
                 SELECT count(*) FROM comments c WHERE NOT EXISTS (SELECT 1 FROM posts p WHERE p.id = c.post_id)
                 """, Long.class);
 
-        meterRegistry.gauge("reconciliation.orphan_post_votes_removed", orphanPostVotes);
-        meterRegistry.gauge("reconciliation.orphan_comment_votes_removed", orphanCommentVotes);
-        meterRegistry.gauge("reconciliation.orphan_comments_found", orphanComments == null ? 0 : orphanComments);
+        orphanPostVotesGauge.set(orphanPostVotes);
+        orphanCommentVotesGauge.set(orphanCommentVotes);
+        orphanCommentsGauge.set(orphanComments == null ? 0 : orphanComments);
         if (orphanComments != null && orphanComments > 0) {
             log.warn("reconciliation: {} comments reference a missing post — investigate before trusting the soft-delete invariant again", orphanComments);
         }

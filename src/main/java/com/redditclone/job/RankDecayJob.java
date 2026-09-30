@@ -27,10 +27,14 @@ public class RankDecayJob {
     @SchedulerLock(name = "rankDecayJob", lockAtLeastFor = "10s", lockAtMostFor = "4m")
     @Transactional
     public void decayRising() {
+        // rising_rank always decays to exactly 0 within about an hour of no new votes (halved every 5
+        // minutes here, floored below 0.01), so a post untouched for 24h+ can never legitimately still
+        // have rising_rank > 0 — this bound doesn't change which rows match, it just lets the new
+        // posts_rising_active_idx (V10) turn this from a full-table scan into a bounded range scan.
         jdbc.update("""
                 UPDATE posts
                 SET rising_rank = CASE WHEN rising_rank * 0.5 < 0.01 THEN 0 ELSE rising_rank * 0.5 END
-                WHERE rising_rank > 0 AND NOT removed
+                WHERE rising_rank > 0 AND NOT removed AND rising_updated_at > now() - interval '24 hours'
                 """);
     }
 }

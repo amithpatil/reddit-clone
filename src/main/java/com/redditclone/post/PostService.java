@@ -62,6 +62,10 @@ public class PostService {
         p.setTitle(sanitizer.sanitize(req.title()));
         p.setBody(sanitizer.sanitize(req.body()));
         p.setUrl(req.url());
+        // Unlike controversial_rank/rising_rank, hot_rank's formula isn't 0 at zero votes (it also
+        // carries a time term) — without this, every new post sits at the column default of 0 until its
+        // first vote, sorting below any post that's ever been voted on, regardless of how new it is.
+        p.setHotRank(RankFormulas.hotRank(0, p.getCreatedAt()));
         posts.save(p);
         return p;
     }
@@ -139,13 +143,17 @@ public class PostService {
             double controversialRank = RankFormulas.controversialRank(ups, downs);
 
             // "Rising" is this project's own definition (the source plan leaves it undefined): recent
-            // vote velocity, measured as this batch's vote-event count over the time since this post's
-            // rank was last touched (or since it was created, for its first-ever vote). A burst of votes
-            // spikes rising_rank; RankDecayJob halves it periodically so silence lets it fade, since this
-            // value is only ever recomputed here, on a vote, not continuously.
-            int eventCount = deltas.get(id).eventCount();
+            // vote velocity, measured as this batch's net vote-magnitude (|upsDelta| + |downsDelta|) over
+            // the time since this post's rank was last touched (or since it was created, for its
+            // first-ever vote). Using the net magnitude rather than a raw per-event count means a vote
+            // immediately canceled by an unvote (net zero ups/downs change) contributes nothing — vote
+            // churn can't inflate rising_rank with no real engagement behind it. A burst of votes spikes
+            // rising_rank; RankDecayJob halves it periodically so silence lets it fade, since this value
+            // is only ever recomputed here, on a vote, not continuously.
+            VoteDelta delta = deltas.get(id);
+            int voteMagnitude = Math.abs(delta.upsDelta()) + Math.abs(delta.downsDelta());
             double elapsedMinutes = Math.max(Duration.between(risingUpdatedAt, now).toSeconds() / 60.0, 1.0 / 60);
-            double risingRank = eventCount / elapsedMinutes;
+            double risingRank = voteMagnitude / elapsedMinutes;
 
             rankParams.add(new MapSqlParameterSource()
                     .addValue("id", id)
@@ -153,7 +161,7 @@ public class PostService {
                     .addValue("controversialRank", controversialRank)
                     .addValue("risingRank", risingRank));
 
-            int scoreDelta = deltas.get(id).scoreDelta();
+            int scoreDelta = delta.scoreDelta();
             if (scoreDelta != 0) {
                 karmaEvents.add(new KarmaEvent(authorId, scoreDelta, id));
             }

@@ -152,9 +152,8 @@ public class Post {
         return score;
     }
 
-    public void setScore(int score) {
-        this.score = score;
-    }
+    // No setter: score is exclusively mutated via PostService.applyVoteDeltas's raw-SQL bulk update,
+    // same reasoning as hot_rank/ups/downs below.
 
     public int getCommentCount() {
         return commentCount;
@@ -167,9 +166,18 @@ public class Post {
         return hotRank;
     }
 
-    // No setter: hot_rank/ups/downs/controversial_rank/rising_rank/rising_updated_at are exclusively
-    // mutated via PostService.applyVoteDeltas's raw-SQL bulk update, same reasoning as commentCount —
-    // Hibernate still hydrates these fields on read via its own field access, no setter needed for that.
+    // Package-private, not public: hot_rank's formula gives a never-voted post a nonzero, time-driven
+    // value (unlike controversial_rank/rising_rank, which are correctly 0 at zero votes), so PostService
+    // .create() must set it once at insert time or new posts sort below every voted post on /hot forever.
+    // Every later change goes through PostService.applyVoteDeltas's raw-SQL bulk update instead — same
+    // one-legitimate-use reasoning as Community.setSubscriberCount.
+    void setHotRank(double hotRank) {
+        this.hotRank = hotRank;
+    }
+
+    // No setter: ups/downs/controversial_rank/rising_rank/rising_updated_at are exclusively mutated via
+    // PostService.applyVoteDeltas's raw-SQL bulk update, same reasoning as commentCount — Hibernate still
+    // hydrates these fields on read via its own field access, no setter needed for that.
 
     public int getUps() {
         return ups;
