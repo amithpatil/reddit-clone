@@ -115,6 +115,15 @@ public class PostController {
         return communityService.listFlairs(communityId, type);
     }
 
+    // Public, small, uncapped-pagination list — deliberately not folded into /new or /hot's own sort order
+    // (see the pin/lock feature's plan: doing so would require converting those queries' proven JPQL
+    // keyset pagination to native SQL for a 3-column tuple cursor comparison, real risk for cosmetic gain).
+    @GetMapping("/pinned")
+    public List<Post> pinned(@PathVariable String communityName) {
+        UUID communityId = communityService.findByName(communityName).getId();
+        return postService.findPinned(communityId);
+    }
+
     // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key, see PostService.search.
     @GetMapping("/search")
     public Listing<Post> search(@PathVariable String communityName, @RequestParam("q") String query) {

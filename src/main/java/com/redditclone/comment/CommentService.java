@@ -7,6 +7,7 @@ import com.redditclone.common.RankFormulas;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.VoteDelta;
 import com.redditclone.common.exception.BadRequestException;
+import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
 import com.redditclone.community.CommunityService;
@@ -71,6 +72,9 @@ public class CommentService {
         // without a second lookup, for the ban/automod checks below.
         Post post = postService.findById(postId);
         communityService.requireNotBanned(authorId, post.getCommunityId());
+        if (post.isLocked()) {
+            throw new ForbiddenException("this post is locked");
+        }
         String sanitizedBody = sanitizer.sanitize(body);
         Comment c = new Comment();
         c.setId(ids.nextId());

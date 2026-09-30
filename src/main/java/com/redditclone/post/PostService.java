@@ -5,6 +5,7 @@ import com.redditclone.common.KarmaEvent;
 import com.redditclone.common.RankFormulas;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.VoteDelta;
+import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
 import com.redditclone.community.CommunityService;
@@ -13,6 +14,7 @@ import com.redditclone.media.Media;
 import com.redditclone.media.MediaService;
 import com.redditclone.media.MediaView;
 import com.redditclone.post.dto.CreatePostRequest;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -44,10 +46,11 @@ public class PostService {
     private final CommunityService communityService;
     private final AuthService authService;
     private final MediaService mediaService;
+    private final int maxPinnedPosts;
 
     public PostService(PostRepository posts, UuidV7Generator ids, StringRedisTemplate redis, Sanitizer sanitizer,
                         NamedParameterJdbcTemplate jdbc, CommunityService communityService, AuthService authService,
-                        MediaService mediaService) {
+                        MediaService mediaService, @Value("${app.moderation.max-pinned-posts}") int maxPinnedPosts) {
         this.posts = posts;
         this.ids = ids;
         this.redis = redis;
@@ -56,6 +59,7 @@ public class PostService {
         this.communityService = communityService;
         this.authService = authService;
         this.mediaService = mediaService;
+        this.maxPinnedPosts = maxPinnedPosts;
     }
 
     @Transactional
@@ -157,6 +161,36 @@ public class PostService {
         Post p = findById(postId);
         p.setRemoved(true);
         posts.save(p);
+    }
+
+    // No permission check here — same convention as setFlair, ModerationController checks
+    // PERM_MANAGE_POSTS before calling. Pinned posts deliberately don't fold into /new or /hot's sort
+    // order (see the feature's plan) — findPinned below is the only place they're surfaced together.
+    @Transactional
+    public void setPinned(UUID postId, UUID communityId, boolean pinned) {
+        Post p = findById(postId);
+        if (!p.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("post not found");
+        }
+        if (pinned && posts.countByCommunityIdAndPinnedTrue(communityId) >= maxPinnedPosts) {
+            throw new BadRequestException("this community already has the maximum number of pinned posts");
+        }
+        p.setPinned(pinned);
+        posts.save(p);
+    }
+
+    @Transactional
+    public void setLocked(UUID postId, UUID communityId, boolean locked) {
+        Post p = findById(postId);
+        if (!p.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("post not found");
+        }
+        p.setLocked(locked);
+        posts.save(p);
+    }
+
+    public List<Post> findPinned(UUID communityId) {
+        return attachFlair(attachMedia(posts.findByCommunityIdAndPinnedTrueAndRemovedFalseOrderByCreatedAtDesc(communityId)));
     }
 
     // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key the way created_at/

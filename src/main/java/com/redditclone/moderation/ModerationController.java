@@ -164,6 +164,34 @@ public class ModerationController {
         postService.setFlair(postId, communityId, req.flairId());
     }
 
+    @PostMapping("/r/{name}/mod/posts/{postId}/pin")
+    public void pinPost(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID postId) {
+        UUID communityId = communityId(name);
+        communityService.requirePermission(userId, communityId, CommunityModerator.PERM_MANAGE_POSTS);
+        postService.setPinned(postId, communityId, true);
+    }
+
+    @DeleteMapping("/r/{name}/mod/posts/{postId}/pin")
+    public void unpinPost(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID postId) {
+        UUID communityId = communityId(name);
+        communityService.requirePermission(userId, communityId, CommunityModerator.PERM_MANAGE_POSTS);
+        postService.setPinned(postId, communityId, false);
+    }
+
+    @PostMapping("/r/{name}/mod/posts/{postId}/lock")
+    public void lockPost(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID postId) {
+        UUID communityId = communityId(name);
+        communityService.requirePermission(userId, communityId, CommunityModerator.PERM_MANAGE_POSTS);
+        postService.setLocked(postId, communityId, true);
+    }
+
+    @DeleteMapping("/r/{name}/mod/posts/{postId}/lock")
+    public void unlockPost(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID postId) {
+        UUID communityId = communityId(name);
+        communityService.requirePermission(userId, communityId, CommunityModerator.PERM_MANAGE_POSTS);
+        postService.setLocked(postId, communityId, false);
+    }
+
     private UUID communityId(String name) {
         return communityService.findByName(name).getId();
     }

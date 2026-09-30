@@ -105,4 +105,8 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
             LIMIT 25
             """, nativeQuery = true)
     List<UUID> searchIds(@Param("communityId") UUID communityId, @Param("query") String query);
+
+    int countByCommunityIdAndPinnedTrue(UUID communityId);
+
+    List<Post> findByCommunityIdAndPinnedTrueAndRemovedFalseOrderByCreatedAtDesc(UUID communityId);
 }

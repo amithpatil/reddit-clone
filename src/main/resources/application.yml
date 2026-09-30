@@ -48,6 +48,8 @@ app:
     max-video-bytes: ${MEDIA_MAX_VIDEO_BYTES:209715200}    # 200MB
   chat:
     max-message-length: ${CHAT_MAX_MESSAGE_LENGTH:4000}
+  moderation:
+    max-pinned-posts: ${MAX_PINNED_POSTS:2}   # old Reddit's historical sticky-post cap
 
 management:
   endpoints:
