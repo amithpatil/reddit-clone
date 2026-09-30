@@ -59,11 +59,11 @@ public class PostController {
     }
 
     @GetMapping("/new")
-    public Listing<Post> listNew(@PathVariable String communityName,
+    public Listing<Post> listNew(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                   @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
         Cursor cursor = CursorCodec.decode(after);
-        List<Post> page = postService.findNewPage(communityId, cursor.createdAt(), cursor.id(), PAGE_SIZE);
+        List<Post> page = postService.findNewPage(communityId, cursor.createdAt(), cursor.id(), viewerId, PAGE_SIZE);
 
         List<Thing<Post>> children = page.stream().map(p -> new Thing<>(POST_KIND, p)).toList();
         String next = page.isEmpty() ? null
@@ -74,11 +74,14 @@ public class PostController {
     // Page 1 only (no `after`) is cache-eligible — see FeedCacheService. Uniformly returns a raw JSON
     // string (via ResponseEntity) for both the cache-hit and freshly-computed paths, rather than
     // deserializing a cached body back into a Listing<Post> only to reserialize it identically.
+    // The cache is per-community, not per-viewer, so it's fundamentally incompatible with a per-viewer
+    // hidden-items filter — only used at all when viewerId == null (unauthenticated); an authenticated
+    // request (which may have a hide-list) always computes fresh.
     @GetMapping("/hot")
-    public ResponseEntity<String> listHot(@PathVariable String communityName,
+    public ResponseEntity<String> listHot(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                            @RequestParam(required = false) String after) {
         boolean firstPage = after == null || after.isBlank();
-        if (firstPage) {
+        if (firstPage && viewerId == null) {
             Optional<String> cached = feedCache.getHotPage(communityName);
             if (cached.isPresent()) {
                 return jsonResponse(cached.get());
@@ -86,10 +89,10 @@ public class PostController {
         }
         UUID communityId = communityService.findByName(communityName).getId();
         RankCursor cursor = RankCursorCodec.decode(after, "hot");
-        List<Post> page = postService.findHotPage(communityId, cursor.rank(), cursor.id(), PAGE_SIZE);
+        List<Post> page = postService.findHotPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         Listing<Post> listing = rankListing("hot", page, Post::getHotRank, null);
         String body = json.writeValueAsString(listing);
-        if (firstPage) {
+        if (firstPage && viewerId == null) {
             feedCache.putHotPage(communityName, body);
         }
         return jsonResponse(body);
@@ -113,7 +116,7 @@ public class PostController {
     // anchorEpochSecond) rather than recomputed from Instant.now() on every page — otherwise a client
     // paging over several minutes gets a moving window that can skip or duplicate rows at the boundary.
     @GetMapping("/top")
-    public Listing<Post> listTop(@PathVariable String communityName,
+    public Listing<Post> listTop(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                   @RequestParam(required = false) String after,
                                   @RequestParam(name = "t", required = false, defaultValue = "all") String period) {
         UUID communityId = communityService.findByName(communityName).getId();
@@ -122,25 +125,25 @@ public class PostController {
                 ? Instant.ofEpochSecond(cursor.anchorEpochSecond())
                 : Instant.now();
         Instant since = periodCutoff(period, anchor);
-        List<Post> page = postService.findTopPage(communityId, since, cursor.rank(), cursor.id(), PAGE_SIZE);
+        List<Post> page = postService.findTopPage(communityId, since, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         return rankListing("top", page, p -> (double) p.getScore(), anchor.getEpochSecond());
     }
 
     @GetMapping("/rising")
-    public Listing<Post> listRising(@PathVariable String communityName,
+    public Listing<Post> listRising(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                      @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
         RankCursor cursor = RankCursorCodec.decode(after, "rising");
-        List<Post> page = postService.findRisingPage(communityId, cursor.rank(), cursor.id(), PAGE_SIZE);
+        List<Post> page = postService.findRisingPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         return rankListing("rising", page, Post::getRisingRank, null);
     }
 
     @GetMapping("/controversial")
-    public Listing<Post> listControversial(@PathVariable String communityName,
+    public Listing<Post> listControversial(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                             @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
         RankCursor cursor = RankCursorCodec.decode(after, "controversial");
-        List<Post> page = postService.findControversialPage(communityId, cursor.rank(), cursor.id(), PAGE_SIZE);
+        List<Post> page = postService.findControversialPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         return rankListing("controversial", page, Post::getControversialRank, null);
     }
 

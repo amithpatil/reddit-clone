@@ -36,6 +36,16 @@ app:
     # If set, SystemAccountBootstrap promotes this username to site admin on every startup (idempotent —
     # a no-op once they already are one). Empty by default: no admin exists until explicitly configured.
     bootstrap-username: ${ADMIN_BOOTSTRAP_USERNAME:}
+  storage:
+    endpoint: ${STORAGE_ENDPOINT:http://localhost:9000}    # adobe/s3mock locally; Cloudflare R2's S3-compatible endpoint in prod
+    bucket: ${STORAGE_BUCKET:reddit-clone-media}
+    access-key: ${STORAGE_ACCESS_KEY:test}    # s3mock doesn't validate credentials; any non-empty value works locally
+    secret-key: ${STORAGE_SECRET_KEY:test}
+    region: auto   # R2 has no real regions; the AWS SDK still requires a non-null region string
+  media:
+    public-base-url: ${MEDIA_PUBLIC_BASE_URL:http://localhost:9000/reddit-clone-media}
+    max-image-bytes: ${MEDIA_MAX_IMAGE_BYTES:20971520}     # 20MB
+    max-video-bytes: ${MEDIA_MAX_VIDEO_BYTES:209715200}    # 200MB
 
 management:
   endpoints:

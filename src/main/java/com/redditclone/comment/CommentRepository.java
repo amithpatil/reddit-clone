@@ -15,12 +15,16 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     // Ordered by best_rank (Wilson score lower bound on the up/down split, see RankFormulas.bestRank) —
     // Reddit's own default comment sort, not raw score: a 95-up/5-down reply outranks a 10-up/0-down one
     // despite the smaller net score, because the larger sample gives more confidence in the ratio.
+    // The NOT EXISTS/HiddenItem clause is the same viewer-scoped, ArchUnit-invisible JPQL pattern used in
+    // PostRepository — see its comment. viewerId is null for an unauthenticated request.
     @Query("""
             SELECT c FROM Comment c
             WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.bestRank DESC, c.id DESC
             """)
-    List<Comment> findTopLevel(@Param("postId") UUID postId, Pageable limit); // capped, never unbounded
+    List<Comment> findTopLevel(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit); // capped, never unbounded
 
     // clearAutomatically: without it, a `parent` entity already loaded in this transaction (see
     // CommentService.reply) keeps its stale pre-increment childCount in the persistence context, and a

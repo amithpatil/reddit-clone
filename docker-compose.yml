@@ -26,5 +26,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+  s3mock:
+    # minio/minio's Docker Hub repository now requires authentication to pull at all (confirmed live —
+    # even old pinned tags are denied), so local dev uses adobe/s3mock instead: a lightweight,
+    # MIT-licensed, publicly-pullable S3-compatible mock server built for exactly this use case. Same
+    # AWS SDK v2 S3 client works against either it or the real Cloudflare R2 endpoint used in prod.
+    image: adobe/s3mock
+    environment:
+      COM_ADOBE_TESTING_S3MOCK_STORE_INITIAL_BUCKETS: reddit-clone-media
+    ports: ["9000:9090"]   # keep the app-facing port the same as the original MinIO plan (9090 internally)
 volumes:
   pgdata:

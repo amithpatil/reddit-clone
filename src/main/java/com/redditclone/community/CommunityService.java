@@ -1,5 +1,6 @@
 package com.redditclone.community;
 
+import com.redditclone.auth.AuthService;
 import com.redditclone.common.ModerationAuditWriter;
 import com.redditclone.common.SystemAccounts;
 import com.redditclone.common.UuidV7Generator;
@@ -38,6 +39,7 @@ public class CommunityService {
     private final UuidV7Generator ids;
     private final ObjectMapper json;
     private final ModerationAuditWriter auditWriter;
+    private final AuthService authService;
     private final ExecutorService regexExecutor =
             Executors.newFixedThreadPool(2, r -> {
                 Thread t = new Thread(r, "automod-regex");
@@ -48,7 +50,7 @@ public class CommunityService {
     public CommunityService(CommunityRepository communities, MembershipRepository memberships,
                              CommunityModeratorRepository moderators, BanRepository bans,
                              AutomodRuleRepository automodRules, UuidV7Generator ids,
-                             ObjectMapper json, ModerationAuditWriter auditWriter) {
+                             ObjectMapper json, ModerationAuditWriter auditWriter, AuthService authService) {
         this.communities = communities;
         this.memberships = memberships;
         this.moderators = moderators;
@@ -57,6 +59,7 @@ public class CommunityService {
         this.ids = ids;
         this.json = json;
         this.auditWriter = auditWriter;
+        this.authService = authService;
     }
 
     @Transactional
@@ -135,7 +138,15 @@ public class CommunityService {
 
     // ==================== Moderation: permissions ====================
 
+    // isActive() gates every permission check here so a deleted/banned account's still-valid access token
+    // (up to its remaining TTL — the same accepted window banAccount already relies on) can't keep
+    // exercising moderator authority: deleteAccount()/banAccount() anonymize or lock the users row but
+    // never touch community_moderators, and this was previously the only place that gap was reachable
+    // from, since login()/refresh() were the only status checks anywhere in the app.
     public boolean hasModPermission(UUID userId, UUID communityId, int requiredBit) {
+        if (!authService.isActive(userId)) {
+            return false;
+        }
         return moderators.findByCommunityIdAndUserId(communityId, userId)
                 .map(m -> (m.getPermissions() & requiredBit) == requiredBit)
                 .orElse(false);
@@ -148,7 +159,7 @@ public class CommunityService {
     }
 
     public void requireAnyModPermission(UUID userId, UUID communityId) {
-        if (!moderators.existsByCommunityIdAndUserId(communityId, userId)) {
+        if (!authService.isActive(userId) || !moderators.existsByCommunityIdAndUserId(communityId, userId)) {
             throw new ForbiddenException("not a moderator of this community");
         }
     }

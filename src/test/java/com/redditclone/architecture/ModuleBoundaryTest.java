@@ -39,6 +39,22 @@ class ModuleBoundaryTest {
     static final ArchRule moderation_repositories_are_only_accessed_within_moderation =
             repositoryAccessRule("..moderation..");
 
+    @ArchTest
+    static final ArchRule media_repositories_are_only_accessed_within_media =
+            repositoryAccessRule("..media..");
+
+    @ArchTest
+    static final ArchRule notify_repositories_are_only_accessed_within_notify =
+            repositoryAccessRule("..notify..");
+
+    @ArchTest
+    static final ArchRule message_repositories_are_only_accessed_within_message =
+            repositoryAccessRule("..message..");
+
+    @ArchTest
+    static final ArchRule engagement_repositories_are_only_accessed_within_engagement =
+            repositoryAccessRule("..engagement..");
+
     // Modules only talk to each other through services, never by reaching into another module's
     // repository directly (see the source plan's System architecture section). `common` and
     // SecurityConfig are exempt: wiring auth.JwtAuthFilter into the security filter chain is legitimate

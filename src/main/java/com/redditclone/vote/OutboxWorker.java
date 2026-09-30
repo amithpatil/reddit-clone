@@ -51,9 +51,14 @@ public class OutboxWorker {
     @SchedulerLock(name = "outboxWorker", lockAtLeastFor = "1s", lockAtMostFor = "30s") // only one instance runs this at a time
     @Transactional
     public void processBatch() {
+        // event_type <> 'notification': that slice belongs to notify.NotificationOutboxWorker, which owns
+        // the notifications table's schema knowledge the way this worker owns posts/comments/karma. The
+        // exclusion (rather than an exact allowlist of vote event types) keeps this claim query forward-
+        // compatible with any future non-notification event type, which still falls through to the
+        // existing "unrecognized" warning below exactly as before.
         List<Map<String, Object>> events = jdbc.queryForList("""
                 SELECT id, event_type, payload FROM outbox_events
-                WHERE processed_at IS NULL
+                WHERE processed_at IS NULL AND event_type <> 'notification'
                 ORDER BY id
                 LIMIT %d
                 FOR UPDATE SKIP LOCKED
@@ -75,12 +80,14 @@ public class OutboxWorker {
         for (Map<String, Object> event : events) {
             String type = (String) event.get("event_type");
             try {
-                VoteEventPayload payload = parsePayload(event.get("payload").toString());
-                int[] delta = computeDelta(payload);
-                if (type.startsWith("post_vote")) {
-                    accumulate(postAgg, payload.targetId(), delta);
-                } else if (type.startsWith("comment_vote")) {
-                    accumulate(commentAgg, payload.targetId(), delta);
+                if (type.startsWith("post_vote") || type.startsWith("comment_vote")) {
+                    VoteEventPayload payload = parsePayload(event.get("payload").toString());
+                    int[] delta = computeDelta(payload);
+                    if (type.startsWith("post_vote")) {
+                        accumulate(postAgg, payload.targetId(), delta);
+                    } else {
+                        accumulate(commentAgg, payload.targetId(), delta);
+                    }
                 } else {
                     log.warn("outbox event {} has unrecognized event_type '{}', marking processed without applying it", event.get("id"), type);
                 }

@@ -8,6 +8,9 @@ import com.redditclone.common.VoteDelta;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
 import com.redditclone.community.CommunityService;
+import com.redditclone.media.Media;
+import com.redditclone.media.MediaService;
+import com.redditclone.media.MediaView;
 import com.redditclone.post.dto.CreatePostRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -22,6 +25,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -38,9 +42,11 @@ public class PostService {
     private final NamedParameterJdbcTemplate jdbc;
     private final CommunityService communityService;
     private final AuthService authService;
+    private final MediaService mediaService;
 
     public PostService(PostRepository posts, UuidV7Generator ids, StringRedisTemplate redis, Sanitizer sanitizer,
-                        NamedParameterJdbcTemplate jdbc, CommunityService communityService, AuthService authService) {
+                        NamedParameterJdbcTemplate jdbc, CommunityService communityService, AuthService authService,
+                        MediaService mediaService) {
         this.posts = posts;
         this.ids = ids;
         this.redis = redis;
@@ -48,6 +54,7 @@ public class PostService {
         this.jdbc = jdbc;
         this.communityService = communityService;
         this.authService = authService;
+        this.mediaService = mediaService;
     }
 
     @Transactional
@@ -59,11 +66,22 @@ public class PostService {
         Boolean claimed = redis.opsForValue().setIfAbsent(key, newId.toString(), Duration.ofHours(24));
         if (!Boolean.TRUE.equals(claimed)) {
             String existingPostId = redis.opsForValue().get(key);
-            return posts.findById(UUID.fromString(existingPostId))
-                    .orElseThrow(() -> new NotFoundException("post not found"));
+            return attachMedia(posts.findById(UUID.fromString(existingPostId))
+                    .orElseThrow(() -> new NotFoundException("post not found")));
         }
         try {
             communityService.requireNotBanned(authorId, communityId);
+            // Never trust a client-supplied mediaId without checking it resolves to something real, owned
+            // by the caller, and actually usable — same principle already applied to vote targets. Runs
+            // whenever mediaId is present, regardless of kind (a text/link post with a mediaId is exactly
+            // as untrusted as an image/video one), and expectedKind=req.kind() rejects a mismatch between
+            // the media's real type and what the post claims to be — including any text/link kind, since
+            // Media.mediaType is never anything but "image"/"video". Placed here, inside the try block, so
+            // a rejection releases the idempotency key above instead of permanently poisoning it.
+            Media validatedMedia = null;
+            if (req.mediaId() != null) {
+                validatedMedia = mediaService.requireOwnedAndUsable(req.mediaId(), authorId, req.kind());
+            }
             String title = sanitizer.sanitize(req.title());
             String body = sanitizer.sanitize(req.body());
             Post p = new Post();
@@ -74,6 +92,7 @@ public class PostService {
             p.setTitle(title);
             p.setBody(body);
             p.setUrl(req.url());
+            p.setMediaId(req.mediaId());
             // Unlike controversial_rank/rising_rank, hot_rank's formula isn't 0 at zero votes (it also
             // carries a time term) — without this, every new post sits at the column default of 0 until its
             // first vote, sorting below any post that's ever been voted on, regardless of how new it is.
@@ -86,7 +105,13 @@ public class PostService {
                 p.setRemoved(true);
             }
             posts.save(p);
-            return p;
+            if (validatedMedia != null) {
+                // Reuse the row requireOwnedAndUsable already fetched instead of a second findAllById
+                // round trip a moment later via attachMedia() for a row that can't have changed since.
+                p.setMedia(mediaService.toMediaView(validatedMedia));
+                return p;
+            }
+            return attachMedia(p);
         } catch (RuntimeException e) {
             // The Redis claim above is outside this method's @Transactional boundary, so rolling back the
             // DB insert (e.g. on a ForbiddenException from requireNotBanned) doesn't undo it — release the
@@ -97,12 +122,19 @@ public class PostService {
         }
     }
 
-    public List<Post> findNewPage(UUID communityId, Instant cursorCreatedAt, UUID cursorId, int limit) {
-        return posts.findNewPage(communityId, cursorCreatedAt, cursorId, Pageable.ofSize(limit));
+    public List<Post> findNewPage(UUID communityId, Instant cursorCreatedAt, UUID cursorId, UUID viewerId, int limit) {
+        return attachMedia(posts.findNewPage(communityId, cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
+    // Deliberately does NOT attach media — used internally by other services (ban checks, comment-reply's
+    // post lookup, moderation target checks) that don't display the post and shouldn't pay for an extra
+    // query they don't need. findByIdWithMedia below is for the display path.
     public Post findById(UUID postId) {
         return posts.findById(postId).orElseThrow(() -> new NotFoundException("post not found"));
+    }
+
+    public Post findByIdWithMedia(UUID postId) {
+        return attachMedia(findById(postId));
     }
 
     // For ModerationService's human-initiated removal path — Post already has a public `removed` setter
@@ -123,27 +155,56 @@ public class PostService {
         }
         Map<UUID, Post> byId = new HashMap<>();
         posts.findAllById(rankedIds).forEach(p -> byId.put(p.getId(), p));
-        return rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList();
+        return attachMedia(rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList());
     }
 
     public void incrementCommentCount(UUID postId) {
         posts.incrementCommentCount(postId);
     }
 
-    public List<Post> findHotPage(UUID communityId, double cursorRank, UUID cursorId, int limit) {
-        return posts.findHotPage(communityId, cursorRank, cursorId, Pageable.ofSize(limit));
+    public List<Post> findHotPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachMedia(posts.findHotPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
-    public List<Post> findTopPage(UUID communityId, Instant since, double cursorRank, UUID cursorId, int limit) {
-        return posts.findTopPage(communityId, since, (int) cursorRank, cursorId, Pageable.ofSize(limit));
+    public List<Post> findTopPage(UUID communityId, Instant since, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachMedia(posts.findTopPage(communityId, since, (int) cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
-    public List<Post> findRisingPage(UUID communityId, double cursorRank, UUID cursorId, int limit) {
-        return posts.findRisingPage(communityId, cursorRank, cursorId, Pageable.ofSize(limit));
+    public List<Post> findRisingPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachMedia(posts.findRisingPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
-    public List<Post> findControversialPage(UUID communityId, double cursorRank, UUID cursorId, int limit) {
-        return posts.findControversialPage(communityId, cursorRank, cursorId, Pageable.ofSize(limit));
+    public List<Post> findControversialPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachMedia(posts.findControversialPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+    }
+
+    // Single batched IN query, never N+1 — called at the end of every page-returning method above (plus
+    // create()'s single-post return) rather than from PostController, so the /hot cache path is
+    // automatically correct: media is attached before the listing is serialized and cached.
+    private List<Post> attachMedia(List<Post> page) {
+        Set<UUID> mediaIds = new HashSet<>();
+        for (Post p : page) {
+            if (p.getMediaId() != null) {
+                mediaIds.add(p.getMediaId());
+            }
+        }
+        if (mediaIds.isEmpty()) {
+            return page;
+        }
+        Map<UUID, MediaView> views = mediaService.getMediaViews(mediaIds);
+        for (Post p : page) {
+            if (p.getMediaId() != null) {
+                p.setMedia(views.get(p.getMediaId()));
+            }
+        }
+        return page;
+    }
+
+    private Post attachMedia(Post p) {
+        if (p.getMediaId() != null) {
+            p.setMedia(mediaService.getMediaViews(Set.of(p.getMediaId())).get(p.getMediaId()));
+        }
+        return p;
     }
 
     // Applies a batch of grouped vote deltas (one entry per post touched, not per vote — see

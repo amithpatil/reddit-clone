@@ -39,16 +39,17 @@ public class CommentController {
     }
 
     @GetMapping("/r/{communityName}/comments/{postId}")
-    public PostWithCommentsView getPostWithComments(@PathVariable String communityName, @PathVariable UUID postId) {
+    public PostWithCommentsView getPostWithComments(@AuthenticationPrincipal UUID viewerId,
+                                                      @PathVariable String communityName, @PathVariable UUID postId) {
         UUID communityId = communityService.findByName(communityName).getId();
-        var post = postService.findById(postId);
+        var post = postService.findByIdWithMedia(postId);
         // The URL's communityName must actually own this post, and a removed post is hidden here the
         // same way it's hidden from /new — otherwise the community segment is decorative and "removed"
         // content stays readable by ID.
         if (post.isRemoved() || !post.getCommunityId().equals(communityId)) {
             throw new NotFoundException("post not found");
         }
-        var comments = commentService.findTopLevel(postId).stream().map(CommentView::from).toList();
+        var comments = commentService.findTopLevel(postId, viewerId).stream().map(CommentView::from).toList();
         return new PostWithCommentsView(post, comments);
     }
 }

@@ -13,8 +13,13 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthService {
@@ -111,8 +116,33 @@ public class AuthService {
         return users.findById(userId).map(User::getKarmaComment).orElse(0);
     }
 
+    // Read by comment.CommentService.reply() to resolve u/{username} mentions to a user id — a
+    // module-boundary-respecting alternative to comment reaching into auth.UserRepository directly
+    // (UserRepository may only be accessed from within auth/common per ModuleBoundaryTest).
+    public Optional<UUID> findUserIdByUsername(String username) {
+        return users.findByUsername(username).map(User::getId);
+    }
+
+    // Batched counterpart to findUserIdByUsername — read by comment.CommentService.notifyMentions to
+    // resolve every u/{username} mention in one query instead of one SELECT per mention.
+    public Map<String, UUID> findUserIdsByUsernames(Set<String> usernames) {
+        if (usernames.isEmpty()) {
+            return Map.of();
+        }
+        return users.findByUsernameIn(usernames).stream()
+                .collect(Collectors.toMap(User::getUsername, User::getId));
+    }
+
+    // Read by community.CommunityService's permission checks so a deleted/banned account's still-valid
+    // access token can't keep exercising moderator/site-admin authority for the remainder of its TTL —
+    // deleteAccount() anonymizes the row but never touches community_moderators/is_site_admin directly.
+    public boolean isActive(UUID userId) {
+        return users.findById(userId).map(u -> "active".equals(u.getStatus())).orElse(false);
+    }
+
     public void requireSiteAdmin(UUID userId) {
-        if (!users.findById(userId).map(User::isSiteAdmin).orElse(false)) {
+        User user = users.findById(userId).orElseThrow(() -> new ForbiddenException("site admin only"));
+        if (!"active".equals(user.getStatus()) || !user.isSiteAdmin()) {
             throw new ForbiddenException("site admin only");
         }
     }
@@ -147,6 +177,47 @@ public class AuthService {
             u.setSiteAdmin(true);
             users.save(u);
         });
+    }
+
+    public UserSettings getSettings(UUID userId) {
+        return userSettings.findById(userId).orElseThrow(() -> new UnauthorizedException("no such user"));
+    }
+
+    @Transactional
+    public UserSettings updateSettings(UUID userId, Boolean nsfwBlur, Map<String, Object> privacyPrefs) {
+        UserSettings settings = getSettings(userId);
+        if (nsfwBlur != null) {
+            settings.setNsfwBlur(nsfwBlur);
+        }
+        if (privacyPrefs != null) {
+            // Merge, not replace — a PATCH carrying only one key (e.g. {"showEmail": true}) must not wipe
+            // out every other previously-set key, which a wholesale settings.setPrivacyPrefs(privacyPrefs)
+            // would otherwise do.
+            Map<String, Object> merged = new HashMap<>(settings.getPrivacyPrefs());
+            merged.putAll(privacyPrefs);
+            settings.setPrivacyPrefs(merged);
+        }
+        return userSettings.save(settings);
+    }
+
+    // Near-identical shape to banAccount: verify the password first (401, no state change, on mismatch —
+    // matches the checkpoint exactly), then anonymize rather than hard-delete or cascade, matching this
+    // codebase's established soft-delete philosophy for content (posts/comments keep their now-anonymized
+    // authorId untouched). email/username/password_hash are all NOT NULL, so they're overwritten with
+    // unusable-but-valid values, never nulled. revokeAllForUser is the exact pre-built, previously-unused
+    // method banAccount's own comment already flagged as being there for this.
+    @Transactional
+    public void deleteAccount(UUID userId, String rawPassword) {
+        User user = users.findById(userId).orElseThrow(() -> new UnauthorizedException("no such user"));
+        if (!encoder.matches(rawPassword, user.getPasswordHash())) {
+            throw new UnauthorizedException("password does not match");
+        }
+        user.setUsername("deleted_" + user.getId());
+        user.setEmail(user.getId() + "@deleted.invalid");
+        user.setPasswordHash(encoder.encode(UUID.randomUUID().toString()));
+        user.setStatus("deleted");
+        users.save(user);
+        refreshTokens.revokeAllForUser(userId);
     }
 
     private void logAccountAction(UUID actorId, UUID targetUserId, String action, String reason) {

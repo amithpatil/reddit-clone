@@ -5,7 +5,9 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface UserRepository extends JpaRepository<User, UUID> {
@@ -20,6 +22,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByUsername(String username);
 
     Optional<User> findByUsername(String username);
+
+    // Batched counterpart to findByUsername, for resolving several u/{username} mentions in one query.
+    List<User> findByUsernameIn(Set<String> usernames);
 
     // clearAutomatically: same reasoning as CommentRepository.incrementChildCount — without it, a User
     // entity already loaded in this transaction would keep its stale pre-update karma in the persistence

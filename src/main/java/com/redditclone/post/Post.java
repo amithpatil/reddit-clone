@@ -1,9 +1,11 @@
 package com.redditclone.post;
 
+import com.redditclone.media.MediaView;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -30,6 +32,15 @@ public class Post {
     private String body;
 
     private String url;
+
+    @Column(name = "media_id")
+    private UUID mediaId;
+
+    // Populated by PostService.attachMedia() before a Post is ever serialized — never persisted, and
+    // null for text/link posts. Populating it in PostService (not PostController) means the /hot cache
+    // path is automatically correct: media is attached before the listing is serialized and cached.
+    @Transient
+    private MediaView media;
 
     @Column(nullable = false)
     private boolean nsfw;
@@ -130,6 +141,22 @@ public class Post {
 
     public void setUrl(String url) {
         this.url = url;
+    }
+
+    public UUID getMediaId() {
+        return mediaId;
+    }
+
+    public void setMediaId(UUID mediaId) {
+        this.mediaId = mediaId;
+    }
+
+    public MediaView getMedia() {
+        return media;
+    }
+
+    public void setMedia(MediaView media) {
+        this.media = media;
     }
 
     public boolean isNsfw() {

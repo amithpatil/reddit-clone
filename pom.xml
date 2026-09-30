@@ -29,7 +29,19 @@
 	<properties>
 		<java.version>25</java.version>
 		<flyway.version>13.7.0</flyway.version>
+		<awssdk.version>2.55.8</awssdk.version>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${awssdk.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -141,6 +153,19 @@
 			<artifactId>bcprov-jdk18on</artifactId>
 			<version>1.86</version>
 			<scope>runtime</scope>
+		</dependency>
+
+		<!-- media module: S3Client/S3Presigner, pointed at R2 (prod) or MinIO (local dev) — both
+			 S3-compatible, same client either way. Version pinned via the awssdk bom above. -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+		</dependency>
+		<!-- media module: image resize (thumbnail + display variants) for ImageProcessingWorker. -->
+		<dependency>
+			<groupId>net.coobird</groupId>
+			<artifactId>thumbnailator</artifactId>
+			<version>0.4.21</version>
 		</dependency>
 
 		<dependency>

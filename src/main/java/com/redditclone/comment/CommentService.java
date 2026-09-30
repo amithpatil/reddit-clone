@@ -2,6 +2,7 @@ package com.redditclone.comment;
 
 import com.redditclone.auth.AuthService;
 import com.redditclone.common.KarmaEvent;
+import com.redditclone.common.OutboxWriter;
 import com.redditclone.common.RankFormulas;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.VoteDelta;
@@ -19,16 +20,28 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 public class CommentService {
 
     private static final int MAX_DEPTH = 10;
     private static final int TOP_LEVEL_PAGE_SIZE = 50;
+    // u/{username} mention detection. Registration itself allows any characters in a username (no
+    // @Pattern on RegisterRequest), but restricting what's *mentionable* to the conventional
+    // [A-Za-z0-9_] set (matching how comment ltree labels already treat "safe" identifier characters
+    // elsewhere in this codebase) is a reasonable, explicit first-pass limitation, not a bug.
+    // The (?<![\w/]) lookbehind requires whitespace/punctuation/start-of-string immediately before "u/" —
+    // without it, "u/name" matches as a substring of ordinary text/URLs (e.g. "menu/foobar", or the "u/"
+    // inside "example.com/u/alice"), firing a false "mention" notification whenever that substring happens
+    // to match a real username.
+    private static final Pattern MENTION_PATTERN = Pattern.compile("(?<![\\w/])u/([A-Za-z0-9_]{3,32})");
 
     private final CommentRepository comments;
     private final PostService postService;
@@ -37,10 +50,11 @@ public class CommentService {
     private final NamedParameterJdbcTemplate jdbc;
     private final CommunityService communityService;
     private final AuthService authService;
+    private final OutboxWriter outbox;
 
     public CommentService(CommentRepository comments, PostService postService, UuidV7Generator ids,
                            Sanitizer sanitizer, NamedParameterJdbcTemplate jdbc,
-                           CommunityService communityService, AuthService authService) {
+                           CommunityService communityService, AuthService authService, OutboxWriter outbox) {
         this.comments = comments;
         this.postService = postService;
         this.ids = ids;
@@ -48,6 +62,7 @@ public class CommentService {
         this.jdbc = jdbc;
         this.communityService = communityService;
         this.authService = authService;
+        this.outbox = outbox;
     }
 
     @Transactional
@@ -64,11 +79,12 @@ public class CommentService {
         c.setAuthorId(authorId);
         c.setBody(sanitizedBody);
 
+        Comment parent = null;
         if (parentId == null) {
             c.setDepth((short) 0);
             c.setPath(toLabel(c.getId()));
         } else {
-            Comment parent = comments.findById(parentId)
+            parent = comments.findById(parentId)
                     .orElseThrow(() -> new NotFoundException("parent comment not found"));
             if (!parent.getPostId().equals(postId)) {
                 throw new BadRequestException("parent comment does not belong to this post");
@@ -89,11 +105,62 @@ public class CommentService {
         }
         Comment saved = comments.save(c);
         postService.incrementCommentCount(postId);
+        if (!saved.isRemoved()) {
+            notifyFanOut(saved, post, parent, authorId, sanitizedBody);
+        }
         return saved;
     }
 
-    public List<Comment> findTopLevel(UUID postId) {
-        return comments.findTopLevel(postId, Pageable.ofSize(TOP_LEVEL_PAGE_SIZE));
+    // Reply/mention notifications, written as outbox events (common.OutboxWriter) and fanned out into
+    // notifications rows by notify.NotificationOutboxWorker in the same batch-processing shape already
+    // used for vote score/karma updates — comment and notify have no dependency relationship to route a
+    // direct write through, so a shared common writer is the correct fix, same as ModerationAuditWriter.
+    // Skipped entirely for an automod-removed comment (checked by the caller) — no point notifying about a
+    // reply nobody will ever see.
+    private void notifyFanOut(Comment c, Post post, Comment parent, UUID authorId, String sanitizedBody) {
+        if (parent == null) {
+            if (!post.getAuthorId().equals(authorId)) {
+                outbox.writeEvent("notification", Map.of(
+                        "userId", post.getAuthorId(),
+                        "type", "post_reply",
+                        "source", Map.of("postId", post.getId(), "communityId", post.getCommunityId())));
+            }
+        } else if (!parent.getAuthorId().equals(authorId)) {
+            outbox.writeEvent("notification", Map.of(
+                    "userId", parent.getAuthorId(),
+                    "type", "reply",
+                    "source", Map.of("commentId", parent.getId(), "postId", post.getId(), "communityId", post.getCommunityId())));
+        }
+        notifyMentions(c, post, authorId, sanitizedBody);
+    }
+
+    // Concrete design choice for "mention" detection (the source plan lists it as a notification type
+    // but never specifies how): scan for u/{username} tokens, resolve every distinct one in a single
+    // batched query (AuthService.findUserIdsByUsernames) rather than one SELECT per mention, then write
+    // one event per resolved user excluding the author. An unmatched/typo'd username is silently
+    // skipped — the same "a soft failure here shouldn't block the main action" principle already applied
+    // to automod's malformed-rule handling in CommunityService.
+    private void notifyMentions(Comment c, Post post, UUID authorId, String sanitizedBody) {
+        Matcher matcher = MENTION_PATTERN.matcher(sanitizedBody);
+        Set<String> usernames = new HashSet<>();
+        while (matcher.find()) {
+            usernames.add(matcher.group(1));
+        }
+        if (usernames.isEmpty()) {
+            return;
+        }
+        List<Map<String, Object>> payloads = authService.findUserIdsByUsernames(usernames).values().stream()
+                .filter(mentionedId -> !mentionedId.equals(authorId))
+                .<Map<String, Object>>map(mentionedId -> Map.of(
+                        "userId", mentionedId,
+                        "type", "mention",
+                        "source", Map.of("commentId", c.getId(), "postId", post.getId(), "communityId", post.getCommunityId())))
+                .toList();
+        outbox.writeEvents("notification", payloads);
+    }
+
+    public List<Comment> findTopLevel(UUID postId, UUID viewerId) {
+        return comments.findTopLevel(postId, viewerId, Pageable.ofSize(TOP_LEVEL_PAGE_SIZE));
     }
 
     public Comment findById(UUID commentId) {

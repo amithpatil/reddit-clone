@@ -12,15 +12,24 @@ import java.util.UUID;
 
 public interface PostRepository extends JpaRepository<Post, UUID> {
 
+    // The NOT EXISTS clause against HiddenItem is a standard JPQL subquery against another mapped
+    // entity — Hibernate resolves "HiddenItem" against its global metamodel regardless of which Java
+    // package declares it, and since the reference lives inside this @Query string (not a Java import),
+    // it creates no compile-time post -> engagement dependency and no ModuleBoundaryTest cycle risk.
+    // viewerId is null for an unauthenticated request (these endpoints stay public), in which case the
+    // filter is skipped entirely rather than matching nothing.
     @Query("""
             SELECT p FROM Post p
             WHERE p.communityId = :communityId AND p.removed = false
               AND (p.createdAt < :cursorCreatedAt OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
             ORDER BY p.createdAt DESC, p.id DESC
             """)
     List<Post> findNewPage(@Param("communityId") UUID communityId,
                             @Param("cursorCreatedAt") Instant cursorCreatedAt,
                             @Param("cursorId") UUID cursorId,
+                            @Param("viewerId") UUID viewerId,
                             Pageable limit);
 
     @Modifying
@@ -31,45 +40,57 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
             SELECT p FROM Post p
             WHERE p.communityId = :communityId AND p.removed = false
               AND (p.hotRank < :cursorRank OR (p.hotRank = :cursorRank AND p.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
             ORDER BY p.hotRank DESC, p.id DESC
             """)
     List<Post> findHotPage(@Param("communityId") UUID communityId,
                             @Param("cursorRank") double cursorRank,
                             @Param("cursorId") UUID cursorId,
+                            @Param("viewerId") UUID viewerId,
                             Pageable limit);
 
     @Query("""
             SELECT p FROM Post p
             WHERE p.communityId = :communityId AND p.removed = false AND p.createdAt >= :since
               AND (p.score < :cursorScore OR (p.score = :cursorScore AND p.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
             ORDER BY p.score DESC, p.id DESC
             """)
     List<Post> findTopPage(@Param("communityId") UUID communityId,
                             @Param("since") Instant since,
                             @Param("cursorScore") int cursorScore,
                             @Param("cursorId") UUID cursorId,
+                            @Param("viewerId") UUID viewerId,
                             Pageable limit);
 
     @Query("""
             SELECT p FROM Post p
             WHERE p.communityId = :communityId AND p.removed = false
               AND (p.risingRank < :cursorRank OR (p.risingRank = :cursorRank AND p.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
             ORDER BY p.risingRank DESC, p.id DESC
             """)
     List<Post> findRisingPage(@Param("communityId") UUID communityId,
                                @Param("cursorRank") double cursorRank,
                                @Param("cursorId") UUID cursorId,
+                               @Param("viewerId") UUID viewerId,
                                Pageable limit);
 
     @Query("""
             SELECT p FROM Post p
             WHERE p.communityId = :communityId AND p.removed = false
               AND (p.controversialRank < :cursorRank OR (p.controversialRank = :cursorRank AND p.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
             ORDER BY p.controversialRank DESC, p.id DESC
             """)
     List<Post> findControversialPage(@Param("communityId") UUID communityId,
                                       @Param("cursorRank") double cursorRank,
                                       @Param("cursorId") UUID cursorId,
+                                      @Param("viewerId") UUID viewerId,
                                       Pageable limit);
 
     // Returns ranked ids only, not full entities: search_vector is deliberately unmapped on Post (see its
