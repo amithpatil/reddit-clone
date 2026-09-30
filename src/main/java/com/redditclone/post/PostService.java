@@ -62,30 +62,39 @@ public class PostService {
             return posts.findById(UUID.fromString(existingPostId))
                     .orElseThrow(() -> new NotFoundException("post not found"));
         }
-        communityService.requireNotBanned(authorId, communityId);
-        String title = sanitizer.sanitize(req.title());
-        String body = sanitizer.sanitize(req.body());
-        Post p = new Post();
-        p.setId(newId);
-        p.setCommunityId(communityId);
-        p.setAuthorId(authorId);
-        p.setKind(req.kind());
-        p.setTitle(title);
-        p.setBody(body);
-        p.setUrl(req.url());
-        // Unlike controversial_rank/rising_rank, hot_rank's formula isn't 0 at zero votes (it also
-        // carries a time term) — without this, every new post sits at the column default of 0 until its
-        // first vote, sorting below any post that's ever been voted on, regardless of how new it is.
-        p.setHotRank(RankFormulas.hotRank(0, p.getCreatedAt()));
-        // Evaluated after the id is assigned but before save(), so a "remove" verdict is reflected in the
-        // very first row written (never a visible-then-removed flash) and the audit/report rows automod
-        // writes can reference a real, already-decided target id.
-        int authorKarma = authService.getKarmaPost(authorId);
-        if (communityService.evaluateAutomod(communityId, "post", newId, title, body, authorKarma)) {
-            p.setRemoved(true);
+        try {
+            communityService.requireNotBanned(authorId, communityId);
+            String title = sanitizer.sanitize(req.title());
+            String body = sanitizer.sanitize(req.body());
+            Post p = new Post();
+            p.setId(newId);
+            p.setCommunityId(communityId);
+            p.setAuthorId(authorId);
+            p.setKind(req.kind());
+            p.setTitle(title);
+            p.setBody(body);
+            p.setUrl(req.url());
+            // Unlike controversial_rank/rising_rank, hot_rank's formula isn't 0 at zero votes (it also
+            // carries a time term) — without this, every new post sits at the column default of 0 until its
+            // first vote, sorting below any post that's ever been voted on, regardless of how new it is.
+            p.setHotRank(RankFormulas.hotRank(0, p.getCreatedAt()));
+            // Evaluated after the id is assigned but before save(), so a "remove" verdict is reflected in the
+            // very first row written (never a visible-then-removed flash) and the audit/report rows automod
+            // writes can reference a real, already-decided target id.
+            int authorKarma = authService.getKarmaPost(authorId);
+            if (communityService.evaluateAutomod(communityId, "post", newId, title, body, authorKarma)) {
+                p.setRemoved(true);
+            }
+            posts.save(p);
+            return p;
+        } catch (RuntimeException e) {
+            // The Redis claim above is outside this method's @Transactional boundary, so rolling back the
+            // DB insert (e.g. on a ForbiddenException from requireNotBanned) doesn't undo it — release the
+            // key so it doesn't point at a post that was never created, which would otherwise block any
+            // retry with the same Idempotency-Key for 24h behind a misleading 404.
+            redis.delete(key);
+            throw e;
         }
-        posts.save(p);
-        return p;
     }
 
     public List<Post> findNewPage(UUID communityId, Instant cursorCreatedAt, UUID cursorId, int limit) {

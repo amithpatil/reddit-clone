@@ -2,6 +2,9 @@ package com.redditclone.post;
 
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -15,6 +18,8 @@ import java.util.Optional;
 @Service
 public class FeedCacheService {
 
+    private static final Logger log = LoggerFactory.getLogger(FeedCacheService.class);
+
     private final StringRedisTemplate redis;
     private final Cache<String, String> local = Caffeine.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(5)).maximumSize(1000).build();
@@ -23,24 +28,41 @@ public class FeedCacheService {
         this.redis = redis;
     }
 
+    // Before this cache existed, /hot was a pure DB read with no Redis dependency — both methods below
+    // fail open (log and fall back to a cache miss) rather than let a Redis blip turn a working DB-backed
+    // endpoint into a 500.
     public Optional<String> getHotPage(String communityName) {
-        String cached = local.getIfPresent(key(communityName));
+        String cacheKey = key(communityName);
+        String cached = local.getIfPresent(cacheKey);
         if (cached != null) {
             return Optional.of(cached);
         }
-        String fromRedis = redis.opsForValue().get(key(communityName));
-        if (fromRedis != null) {
-            local.put(key(communityName), fromRedis);
+        try {
+            String fromRedis = redis.opsForValue().get(cacheKey);
+            if (fromRedis != null) {
+                local.put(cacheKey, fromRedis);
+            }
+            return Optional.ofNullable(fromRedis);
+        } catch (DataAccessException e) {
+            log.warn("feed cache read failed, falling back to DB", e);
+            return Optional.empty();
         }
-        return Optional.ofNullable(fromRedis);
     }
 
     public void putHotPage(String communityName, String json) {
-        redis.opsForValue().set(key(communityName), json, Duration.ofSeconds(45));
-        local.put(key(communityName), json);
+        String cacheKey = key(communityName);
+        try {
+            redis.opsForValue().set(cacheKey, json, Duration.ofSeconds(45));
+        } catch (DataAccessException e) {
+            log.warn("feed cache write failed, skipping cache", e);
+        }
+        local.put(cacheKey, json);
     }
 
+    // communities.name is citext (case-insensitive), but this key is built from the raw path variable —
+    // lowercasing it so /r/AskReddit/hot and /r/askreddit/hot share one cache entry instead of each
+    // casing getting its own independently-stale copy.
     private String key(String communityName) {
-        return "feed:hot:" + communityName;
+        return "feed:hot:" + communityName.toLowerCase();
     }
 }

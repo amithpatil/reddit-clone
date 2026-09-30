@@ -70,4 +70,10 @@ public class Ban {
     public Instant getCreatedAt() {
         return createdAt;
     }
+
+    // Lets issueBan() preserve the original ban's timestamp when re-issuing over an existing row (JPA
+    // merge would otherwise overwrite created_at with the new instance's Instant.now() default).
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
 }

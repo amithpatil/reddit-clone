@@ -1,10 +1,10 @@
 package com.redditclone.moderation;
 
 import com.redditclone.comment.CommentService;
+import com.redditclone.common.ModerationAuditWriter;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.post.PostService;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,15 +19,15 @@ public class ReportService {
     private final PostService postService;
     private final CommentService commentService;
     private final UuidV7Generator ids;
-    private final JdbcTemplate jdbc;
+    private final ModerationAuditWriter auditWriter;
 
     public ReportService(ReportRepository reports, PostService postService, CommentService commentService,
-                          UuidV7Generator ids, JdbcTemplate jdbc) {
+                          UuidV7Generator ids, ModerationAuditWriter auditWriter) {
         this.reports = reports;
         this.postService = postService;
         this.commentService = commentService;
         this.ids = ids;
-        this.jdbc = jdbc;
+        this.auditWriter = auditWriter;
     }
 
     // communityId is resolved from the target here, never trusted from the client — a report's
@@ -47,11 +47,7 @@ public class ReportService {
         r.setReporterId(reporterId);
         r.setReason(reason);
         Report saved = reports.save(r);
-        jdbc.update("""
-                INSERT INTO mod_queue (community_id, target_type, target_id, report_count, first_reported_at)
-                VALUES (?, ?, ?, 1, now())
-                ON CONFLICT (community_id, target_type, target_id) DO UPDATE SET report_count = mod_queue.report_count + 1
-                """, communityId, targetType, targetId);
+        auditWriter.upsertModQueue(communityId, targetType, targetId);
         return saved;
     }
 }

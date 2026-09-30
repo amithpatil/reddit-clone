@@ -3,13 +3,18 @@ package com.redditclone.moderation;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
+import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
 
 import java.time.Instant;
 import java.util.UUID;
 
+// reports is RANGE-partitioned by created_at (V5__moderation.sql), which requires created_at in the
+// table's actual primary key — mapping only `id` here would let Hibernate's findById/merge queries omit
+// the partition key, forcing Postgres to scan every partition instead of pruning to the relevant one.
 @Entity
 @Table(name = "reports")
+@IdClass(ReportId.class)
 public class Report {
 
     @Id
@@ -36,6 +41,7 @@ public class Report {
     @Column(name = "resolver_id")
     private UUID resolverId;
 
+    @Id
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 

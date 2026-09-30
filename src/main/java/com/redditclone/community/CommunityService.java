@@ -1,11 +1,11 @@
 package com.redditclone.community;
 
+import com.redditclone.common.ModerationAuditWriter;
 import com.redditclone.common.SystemAccounts;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.exception.ConflictException;
 import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -15,11 +15,20 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 @Service
 public class CommunityService {
+
+    // Isolates user-supplied automod regex matching (which can carry a catastrophic-backtracking
+    // pattern) onto a small dedicated pool with a hard timeout, so it can never exhaust the shared
+    // request-handling thread pool the way an unbounded synchronous match could.
+    private static final long REGEX_MATCH_TIMEOUT_MS = 100;
 
     private final CommunityRepository communities;
     private final MembershipRepository memberships;
@@ -28,12 +37,18 @@ public class CommunityService {
     private final AutomodRuleRepository automodRules;
     private final UuidV7Generator ids;
     private final ObjectMapper json;
-    private final JdbcTemplate jdbc;
+    private final ModerationAuditWriter auditWriter;
+    private final ExecutorService regexExecutor =
+            Executors.newFixedThreadPool(2, r -> {
+                Thread t = new Thread(r, "automod-regex");
+                t.setDaemon(true);
+                return t;
+            });
 
     public CommunityService(CommunityRepository communities, MembershipRepository memberships,
                              CommunityModeratorRepository moderators, BanRepository bans,
                              AutomodRuleRepository automodRules, UuidV7Generator ids,
-                             ObjectMapper json, JdbcTemplate jdbc) {
+                             ObjectMapper json, ModerationAuditWriter auditWriter) {
         this.communities = communities;
         this.memberships = memberships;
         this.moderators = moderators;
@@ -41,7 +56,7 @@ public class CommunityService {
         this.automodRules = automodRules;
         this.ids = ids;
         this.json = json;
-        this.jdbc = jdbc;
+        this.auditWriter = auditWriter;
     }
 
     @Transactional
@@ -103,15 +118,19 @@ public class CommunityService {
     @Transactional
     public void issueBan(UUID issuerId, UUID communityId, UUID targetUserId, String reason, Instant expiresAt) {
         requirePermission(issuerId, communityId, CommunityModerator.PERM_BAN_USERS);
-        bans.save(new Ban(communityId, targetUserId, issuerId, reason, expiresAt));
-        logModerationAction(communityId, issuerId, "ban", "user", targetUserId, reason);
+        Ban ban = new Ban(communityId, targetUserId, issuerId, reason, expiresAt);
+        // Re-banning the same user re-issues this row via JPA merge (app-assigned id, never persist()) —
+        // preserve the original created_at instead of letting merge overwrite it with Instant.now().
+        bans.findById(new BanId(communityId, targetUserId)).ifPresent(existing -> ban.setCreatedAt(existing.getCreatedAt()));
+        bans.save(ban);
+        auditWriter.logAction(communityId, issuerId, "ban", "user", targetUserId, reason);
     }
 
     @Transactional
     public void liftBan(UUID issuerId, UUID communityId, UUID targetUserId, String reason) {
         requirePermission(issuerId, communityId, CommunityModerator.PERM_BAN_USERS);
         bans.deleteById(new BanId(communityId, targetUserId));
-        logModerationAction(communityId, issuerId, "unban", "user", targetUserId, reason);
+        auditWriter.logAction(communityId, issuerId, "unban", "user", targetUserId, reason);
     }
 
     // ==================== Moderation: permissions ====================
@@ -137,12 +156,28 @@ public class CommunityService {
     @Transactional
     public void addModerator(UUID actorId, UUID communityId, UUID targetUserId, int permissions) {
         requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_MODERATORS);
-        moderators.save(new CommunityModerator(communityId, targetUserId, permissions, actorId));
+        // Cap the grant to a subset of the actor's own permissions — otherwise a moderator who only holds
+        // PERM_MANAGE_MODERATORS could grant themselves (or anyone) OWNER_PERMISSIONS.
+        int grantorPermissions = moderators.findByCommunityIdAndUserId(communityId, actorId)
+                .map(CommunityModerator::getPermissions).orElse(0);
+        if ((permissions & ~grantorPermissions) != 0) {
+            throw new ForbiddenException("cannot grant permissions beyond your own");
+        }
+        CommunityModerator mod = new CommunityModerator(communityId, targetUserId, permissions, actorId);
+        // Re-adding an existing moderator re-issues this row via JPA merge — preserve the original
+        // added_at instead of letting merge overwrite it with the new instance's Instant.now() default.
+        moderators.findByCommunityIdAndUserId(communityId, targetUserId)
+                .ifPresent(existing -> mod.setAddedAt(existing.getAddedAt()));
+        moderators.save(mod);
     }
 
     @Transactional
     public void removeModerator(UUID actorId, UUID communityId, UUID targetUserId) {
         requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_MODERATORS);
+        Community community = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        if (targetUserId.equals(community.getCreatorId())) {
+            throw new ForbiddenException("cannot remove the community's owner");
+        }
         moderators.deleteByCommunityIdAndUserId(communityId, targetUserId);
     }
 
@@ -167,6 +202,10 @@ public class CommunityService {
     @Transactional
     public void removeAutomodRule(UUID actorId, UUID communityId, UUID ruleId) {
         requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_AUTOMOD);
+        AutomodRule rule = automodRules.findById(ruleId).orElseThrow(() -> new NotFoundException("no such automod rule"));
+        if (!rule.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("no such automod rule");
+        }
         automodRules.deleteById(ruleId);
     }
 
@@ -186,11 +225,11 @@ public class CommunityService {
             }
             boolean removes = "remove".equals(rule.getAction());
             shouldRemove |= removes;
-            logModerationAction(communityId, SystemAccounts.AUTOMOD_USER_ID,
+            auditWriter.logAction(communityId, SystemAccounts.AUTOMOD_USER_ID,
                     removes ? "automod_remove" : "automod_report", targetType, targetId,
                     "matched automod rule " + rule.getId() + " (" + rule.getRuleType() + ")");
             if (!removes) {
-                upsertModQueue(communityId, targetType, targetId);
+                auditWriter.upsertModQueue(communityId, targetType, targetId);
             }
         }
         return shouldRemove;
@@ -209,8 +248,12 @@ public class CommunityService {
                     yield false;
                 }
                 case "regex" -> {
+                    String pattern = config.path("pattern").asString();
+                    if (pattern == null || pattern.isBlank()) {
+                        yield false; // missing/mistyped 'pattern' key: skip rather than matching everything
+                    }
                     try {
-                        yield Pattern.compile(config.path("pattern").asString()).matcher(haystack).find();
+                        yield matchesWithTimeout(Pattern.compile(pattern), haystack);
                     } catch (PatternSyntaxException e) {
                         yield false; // a malformed rule shouldn't block every submission in the community
                     }
@@ -223,24 +266,18 @@ public class CommunityService {
         }
     }
 
-    // ==================== Shared infrastructure tables (raw SQL, not a cross-module repository — same
-    // treatment OutboxWorker already gives outbox_events, and for the same reason: moderation_actions/
-    // mod_queue are genuinely shared infrastructure fed from multiple modules, not owned by any one of
-    // them; importing a `moderation`-module repository class here would recreate the exact
-    // post/comment<->moderation cycle this design avoids). ====================
-
-    private void logModerationAction(UUID communityId, UUID actorId, String action, String targetType, UUID targetId, String reason) {
-        jdbc.update("""
-                INSERT INTO moderation_actions (id, community_id, actor_id, action, target_type, target_id, reason)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """, ids.nextId(), communityId, actorId, action, targetType, targetId, reason);
-    }
-
-    private void upsertModQueue(UUID communityId, String targetType, UUID targetId) {
-        jdbc.update("""
-                INSERT INTO mod_queue (community_id, target_type, target_id, report_count, first_reported_at)
-                VALUES (?, ?, ?, 1, now())
-                ON CONFLICT (community_id, target_type, target_id) DO UPDATE SET report_count = mod_queue.report_count + 1
-                """, communityId, targetType, targetId);
+    // A moderator-supplied regex can carry a catastrophic-backtracking pattern; running it inline on the
+    // request thread would let it hang that thread indefinitely. Bounding it to a small dedicated pool
+    // with a hard timeout means a bad pattern can only ever burn those background threads, never the
+    // shared servlet/DB-transaction pool every other request depends on. A timeout is treated as "no
+    // match" — the same fail-safe already used for a malformed pattern above.
+    private boolean matchesWithTimeout(Pattern pattern, String haystack) {
+        Future<Boolean> future = regexExecutor.submit(() -> pattern.matcher(haystack).find());
+        try {
+            return future.get(REGEX_MATCH_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+        } catch (Exception e) {
+            future.cancel(true);
+            return false;
+        }
     }
 }
