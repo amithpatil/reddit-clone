@@ -45,7 +45,7 @@ public class SecurityConfig {
                         // comment, subscribe, save, message, delete) require one. jwtFilter still runs on these
                         // and populates the principal when a token IS present.
                         .requestMatchers(HttpMethod.GET, "/r/*/new", "/r/*/hot", "/r/*/top", "/r/*/rising",
-                                "/r/*/controversial", "/r/*/comments/*", "/user/*/about")
+                                "/r/*/controversial", "/r/*/search", "/r/*/comments/*", "/user/*/about")
                         .permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         .anyRequest().authenticated())

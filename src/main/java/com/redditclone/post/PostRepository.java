@@ -71,4 +71,17 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
                                       @Param("cursorRank") double cursorRank,
                                       @Param("cursorId") UUID cursorId,
                                       Pageable limit);
+
+    // Returns ranked ids only, not full entities: search_vector is deliberately unmapped on Post (see its
+    // comment), so a native query selecting p.* would return an extra column Hibernate isn't expecting.
+    // PostService.search fetches the actual entities via the ordinary, safely-mapped findAllById and
+    // re-applies this ranking order, rather than fighting native-query-to-entity mapping for one endpoint.
+    @Query(value = """
+            SELECT id FROM posts
+            WHERE community_id = :communityId AND NOT removed
+              AND search_vector @@ websearch_to_tsquery('english', :query)
+            ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', :query)) DESC
+            LIMIT 25
+            """, nativeQuery = true)
+    List<UUID> searchIds(@Param("communityId") UUID communityId, @Param("query") String query);
 }

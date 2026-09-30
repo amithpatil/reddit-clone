@@ -1,0 +1,109 @@
+package com.redditclone.moderation;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+import java.time.Instant;
+import java.util.UUID;
+
+@Entity
+@Table(name = "reports")
+public class Report {
+
+    @Id
+    private UUID id;
+
+    @Column(name = "target_type", nullable = false)
+    private String targetType; // post | comment
+
+    @Column(name = "target_id", nullable = false)
+    private UUID targetId;
+
+    @Column(name = "community_id", nullable = false)
+    private UUID communityId;
+
+    @Column(name = "reporter_id", nullable = false)
+    private UUID reporterId;
+
+    @Column(nullable = false)
+    private String reason;
+
+    @Column(nullable = false)
+    private String status = "open"; // open | resolved | dismissed
+
+    @Column(name = "resolver_id")
+    private UUID resolverId;
+
+    @Column(name = "created_at", nullable = false)
+    private Instant createdAt = Instant.now();
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public String getTargetType() {
+        return targetType;
+    }
+
+    public void setTargetType(String targetType) {
+        this.targetType = targetType;
+    }
+
+    public UUID getTargetId() {
+        return targetId;
+    }
+
+    public void setTargetId(UUID targetId) {
+        this.targetId = targetId;
+    }
+
+    public UUID getCommunityId() {
+        return communityId;
+    }
+
+    public void setCommunityId(UUID communityId) {
+        this.communityId = communityId;
+    }
+
+    public UUID getReporterId() {
+        return reporterId;
+    }
+
+    public void setReporterId(UUID reporterId) {
+        this.reporterId = reporterId;
+    }
+
+    public String getReason() {
+        return reason;
+    }
+
+    public void setReason(String reason) {
+        this.reason = reason;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    public UUID getResolverId() {
+        return resolverId;
+    }
+
+    public void setResolverId(UUID resolverId) {
+        this.resolverId = resolverId;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+}

@@ -1,5 +1,6 @@
 package com.redditclone.comment;
 
+import com.redditclone.auth.AuthService;
 import com.redditclone.common.KarmaEvent;
 import com.redditclone.common.RankFormulas;
 import com.redditclone.common.UuidV7Generator;
@@ -7,6 +8,8 @@ import com.redditclone.common.VoteDelta;
 import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
+import com.redditclone.community.CommunityService;
+import com.redditclone.post.Post;
 import com.redditclone.post.PostService;
 import org.springframework.data.domain.Pageable;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -32,25 +35,34 @@ public class CommentService {
     private final UuidV7Generator ids;
     private final Sanitizer sanitizer;
     private final NamedParameterJdbcTemplate jdbc;
+    private final CommunityService communityService;
+    private final AuthService authService;
 
     public CommentService(CommentRepository comments, PostService postService, UuidV7Generator ids,
-                           Sanitizer sanitizer, NamedParameterJdbcTemplate jdbc) {
+                           Sanitizer sanitizer, NamedParameterJdbcTemplate jdbc,
+                           CommunityService communityService, AuthService authService) {
         this.comments = comments;
         this.postService = postService;
         this.ids = ids;
         this.sanitizer = sanitizer;
         this.jdbc = jdbc;
+        this.communityService = communityService;
+        this.authService = authService;
     }
 
     @Transactional
     public Comment reply(UUID authorId, UUID postId, UUID parentId, String body) {
-        postService.findById(postId); // 404s on a nonexistent/deleted post instead of creating an orphan
+        // 404s on a nonexistent/deleted post instead of creating an orphan; also gives us communityId
+        // without a second lookup, for the ban/automod checks below.
+        Post post = postService.findById(postId);
+        communityService.requireNotBanned(authorId, post.getCommunityId());
+        String sanitizedBody = sanitizer.sanitize(body);
         Comment c = new Comment();
         c.setId(ids.nextId());
         c.setPostId(postId);
         c.setParentId(parentId);
         c.setAuthorId(authorId);
-        c.setBody(sanitizer.sanitize(body));
+        c.setBody(sanitizedBody);
 
         if (parentId == null) {
             c.setDepth((short) 0);
@@ -68,6 +80,13 @@ public class CommentService {
             c.setPath(parent.getPath() + "." + toLabel(c.getId()));
             comments.incrementChildCount(parentId);
         }
+        // Same ordering as PostService.create(): id is already assigned, evaluated before save() so a
+        // "remove" verdict lands in the very first row written, and the audit/report rows automod writes
+        // can reference this comment's real id from the moment it exists.
+        int authorKarma = authService.getKarmaComment(authorId);
+        if (communityService.evaluateAutomod(post.getCommunityId(), "comment", c.getId(), null, sanitizedBody, authorKarma)) {
+            c.setRemoved(true);
+        }
         Comment saved = comments.save(c);
         postService.incrementCommentCount(postId);
         return saved;
@@ -79,6 +98,15 @@ public class CommentService {
 
     public Comment findById(UUID commentId) {
         return comments.findById(commentId).orElseThrow(() -> new NotFoundException("comment not found"));
+    }
+
+    // For ModerationService's human-initiated removal path — Comment already has a public `removed`
+    // setter (unlike score/best_rank/etc, it was never migrated to the raw-SQL-bulk-only pattern).
+    @Transactional
+    public void markRemoved(UUID commentId) {
+        Comment c = findById(commentId);
+        c.setRemoved(true);
+        comments.save(c);
     }
 
     // Applies a batch of grouped vote deltas (one entry per comment touched, not per vote — see

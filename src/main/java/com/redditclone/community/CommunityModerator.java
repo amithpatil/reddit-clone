@@ -14,8 +14,14 @@ import java.util.UUID;
 @IdClass(CommunityModeratorId.class)
 public class CommunityModerator {
 
-    // Bitmask semantics land with Phase 3 Moderation; for now every moderator row created in Phase 1
-    // (only the community creator, via CommunityService.create) uses this "owner" placeholder value.
+    // Bitmask semantics, added in Phase 3. OWNER_PERMISSIONS (every bit set) already satisfies every one
+    // of these, so the moderator rows Phase 1 created (community creators, via CommunityService.create)
+    // need no migration/backfill.
+    public static final int PERM_REMOVE_CONTENT = 1;
+    public static final int PERM_BAN_USERS = 1 << 1;
+    public static final int PERM_MUTE_USERS = 1 << 2;
+    public static final int PERM_MANAGE_AUTOMOD = 1 << 3;
+    public static final int PERM_MANAGE_MODERATORS = 1 << 4;
     public static final int OWNER_PERMISSIONS = Integer.MAX_VALUE;
 
     @Id

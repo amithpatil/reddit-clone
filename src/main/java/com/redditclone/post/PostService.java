@@ -1,11 +1,13 @@
 package com.redditclone.post;
 
+import com.redditclone.auth.AuthService;
 import com.redditclone.common.KarmaEvent;
 import com.redditclone.common.RankFormulas;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.VoteDelta;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
+import com.redditclone.community.CommunityService;
 import com.redditclone.post.dto.CreatePostRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -19,8 +21,10 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -32,14 +36,18 @@ public class PostService {
     private final StringRedisTemplate redis;
     private final Sanitizer sanitizer;
     private final NamedParameterJdbcTemplate jdbc;
+    private final CommunityService communityService;
+    private final AuthService authService;
 
     public PostService(PostRepository posts, UuidV7Generator ids, StringRedisTemplate redis, Sanitizer sanitizer,
-                        NamedParameterJdbcTemplate jdbc) {
+                        NamedParameterJdbcTemplate jdbc, CommunityService communityService, AuthService authService) {
         this.posts = posts;
         this.ids = ids;
         this.redis = redis;
         this.sanitizer = sanitizer;
         this.jdbc = jdbc;
+        this.communityService = communityService;
+        this.authService = authService;
     }
 
     @Transactional
@@ -54,18 +62,28 @@ public class PostService {
             return posts.findById(UUID.fromString(existingPostId))
                     .orElseThrow(() -> new NotFoundException("post not found"));
         }
+        communityService.requireNotBanned(authorId, communityId);
+        String title = sanitizer.sanitize(req.title());
+        String body = sanitizer.sanitize(req.body());
         Post p = new Post();
         p.setId(newId);
         p.setCommunityId(communityId);
         p.setAuthorId(authorId);
         p.setKind(req.kind());
-        p.setTitle(sanitizer.sanitize(req.title()));
-        p.setBody(sanitizer.sanitize(req.body()));
+        p.setTitle(title);
+        p.setBody(body);
         p.setUrl(req.url());
         // Unlike controversial_rank/rising_rank, hot_rank's formula isn't 0 at zero votes (it also
         // carries a time term) — without this, every new post sits at the column default of 0 until its
         // first vote, sorting below any post that's ever been voted on, regardless of how new it is.
         p.setHotRank(RankFormulas.hotRank(0, p.getCreatedAt()));
+        // Evaluated after the id is assigned but before save(), so a "remove" verdict is reflected in the
+        // very first row written (never a visible-then-removed flash) and the audit/report rows automod
+        // writes can reference a real, already-decided target id.
+        int authorKarma = authService.getKarmaPost(authorId);
+        if (communityService.evaluateAutomod(communityId, "post", newId, title, body, authorKarma)) {
+            p.setRemoved(true);
+        }
         posts.save(p);
         return p;
     }
@@ -76,6 +94,27 @@ public class PostService {
 
     public Post findById(UUID postId) {
         return posts.findById(postId).orElseThrow(() -> new NotFoundException("post not found"));
+    }
+
+    // For ModerationService's human-initiated removal path — Post already has a public `removed` setter
+    // (unlike score/hot_rank/etc, it was never migrated to the raw-SQL-bulk-only pattern).
+    @Transactional
+    public void markRemoved(UUID postId) {
+        Post p = findById(postId);
+        p.setRemoved(true);
+        posts.save(p);
+    }
+
+    // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key the way created_at/
+    // score are, so this returns a single page, same as the source plan's own search sketch.
+    public List<Post> search(UUID communityId, String query) {
+        List<UUID> rankedIds = posts.searchIds(communityId, query);
+        if (rankedIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Post> byId = new HashMap<>();
+        posts.findAllById(rankedIds).forEach(p -> byId.put(p.getId(), p));
+        return rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
     public void incrementCommentCount(UUID postId) {

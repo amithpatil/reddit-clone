@@ -35,6 +35,10 @@ class ModuleBoundaryTest {
     static final ArchRule vote_repositories_are_only_accessed_within_vote =
             repositoryAccessRule("..vote..");
 
+    @ArchTest
+    static final ArchRule moderation_repositories_are_only_accessed_within_moderation =
+            repositoryAccessRule("..moderation..");
+
     // Modules only talk to each other through services, never by reaching into another module's
     // repository directly (see the source plan's System architecture section). `common` and
     // SecurityConfig are exempt: wiring auth.JwtAuthFilter into the security filter chain is legitimate

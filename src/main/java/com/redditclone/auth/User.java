@@ -33,6 +33,9 @@ public class User {
     @Column(name = "karma_comment", nullable = false)
     private int karmaComment = 0;
 
+    @Column(name = "is_site_admin", nullable = false)
+    private boolean siteAdmin = false;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -90,6 +93,14 @@ public class User {
 
     public void setKarmaComment(int karmaComment) {
         this.karmaComment = karmaComment;
+    }
+
+    public boolean isSiteAdmin() {
+        return siteAdmin;
+    }
+
+    public void setSiteAdmin(boolean siteAdmin) {
+        this.siteAdmin = siteAdmin;
     }
 
     public Instant getCreatedAt() {

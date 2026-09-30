@@ -10,6 +10,8 @@ import com.redditclone.common.paging.Thing;
 import com.redditclone.community.CommunityService;
 import com.redditclone.post.dto.CreatePostRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,10 +21,12 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.ToDoubleFunction;
 
@@ -35,10 +39,15 @@ public class PostController {
 
     private final PostService postService;
     private final CommunityService communityService;
+    private final FeedCacheService feedCache;
+    private final ObjectMapper json;
 
-    public PostController(PostService postService, CommunityService communityService) {
+    public PostController(PostService postService, CommunityService communityService,
+                           FeedCacheService feedCache, ObjectMapper json) {
         this.postService = postService;
         this.communityService = communityService;
+        this.feedCache = feedCache;
+        this.json = json;
     }
 
     @PostMapping("/submit")
@@ -62,13 +71,41 @@ public class PostController {
         return Listing.of(children, next);
     }
 
+    // Page 1 only (no `after`) is cache-eligible — see FeedCacheService. Uniformly returns a raw JSON
+    // string (via ResponseEntity) for both the cache-hit and freshly-computed paths, rather than
+    // deserializing a cached body back into a Listing<Post> only to reserialize it identically.
     @GetMapping("/hot")
-    public Listing<Post> listHot(@PathVariable String communityName,
-                                  @RequestParam(required = false) String after) {
+    public ResponseEntity<String> listHot(@PathVariable String communityName,
+                                           @RequestParam(required = false) String after) {
+        boolean firstPage = after == null || after.isBlank();
+        if (firstPage) {
+            Optional<String> cached = feedCache.getHotPage(communityName);
+            if (cached.isPresent()) {
+                return jsonResponse(cached.get());
+            }
+        }
         UUID communityId = communityService.findByName(communityName).getId();
         RankCursor cursor = RankCursorCodec.decode(after, "hot");
         List<Post> page = postService.findHotPage(communityId, cursor.rank(), cursor.id(), PAGE_SIZE);
-        return rankListing("hot", page, Post::getHotRank, null);
+        Listing<Post> listing = rankListing("hot", page, Post::getHotRank, null);
+        String body = json.writeValueAsString(listing);
+        if (firstPage) {
+            feedCache.putHotPage(communityName, body);
+        }
+        return jsonResponse(body);
+    }
+
+    private ResponseEntity<String> jsonResponse(String body) {
+        return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body);
+    }
+
+    // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key, see PostService.search.
+    @GetMapping("/search")
+    public Listing<Post> search(@PathVariable String communityName, @RequestParam("q") String query) {
+        UUID communityId = communityService.findByName(communityName).getId();
+        List<Post> results = postService.search(communityId, query);
+        List<Thing<Post>> children = results.stream().map(p -> new Thing<>(POST_KIND, p)).toList();
+        return Listing.of(children, null);
     }
 
     // t = hour|day|week|month|year|all (default all), matching Reddit's own /top query param. The cutoff
