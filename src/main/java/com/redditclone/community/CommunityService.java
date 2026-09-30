@@ -8,6 +8,7 @@ import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.ConflictException;
 import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
+import com.redditclone.community.dto.CommunityRule;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -368,5 +369,23 @@ public class CommunityService {
         }
         m.setFlairId(flairId);
         memberships.save(m);
+    }
+
+    // ==================== Rules ====================
+
+    public List<CommunityRule> getRules(UUID communityId) {
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        return List.of(json.readValue(c.getRules(), CommunityRule[].class));
+    }
+
+    // Whole-list replace, not individual add/remove/reorder — a rules list is edited as one small ordered
+    // unit in practice (max 15 entries), so index-addressed CRUD here would be meaningfully more code for
+    // no real benefit.
+    @Transactional
+    public void setRules(UUID actorId, UUID communityId, List<CommunityRule> rules) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_RULES);
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        c.setRules(json.writeValueAsString(rules));
+        communities.save(c);
     }
 }

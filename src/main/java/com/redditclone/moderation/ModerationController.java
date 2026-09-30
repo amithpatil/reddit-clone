@@ -5,6 +5,7 @@ import com.redditclone.community.CommunityModerator;
 import com.redditclone.community.CommunityService;
 import com.redditclone.community.Flair;
 import com.redditclone.community.dto.SetFlairRequest;
+import com.redditclone.community.dto.SetRulesRequest;
 import com.redditclone.moderation.dto.AddModeratorRequest;
 import com.redditclone.moderation.dto.AutomodRuleRequest;
 import com.redditclone.moderation.dto.BanRequest;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -148,6 +150,14 @@ public class ModerationController {
     @DeleteMapping("/r/{name}/mod/flairs/{flairId}")
     public void removeFlair(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID flairId) {
         communityService.removeFlair(userId, communityId(name), flairId);
+    }
+
+    // Whole-list replace — communityService.setRules checks PERM_MANAGE_RULES internally, same convention
+    // addFlair/removeFlair already use (unlike setPostFlair below, which checks in the controller).
+    @PutMapping("/r/{name}/mod/rules")
+    public void setRules(@AuthenticationPrincipal UUID userId, @PathVariable String name,
+                          @Valid @RequestBody SetRulesRequest req) {
+        communityService.setRules(userId, communityId(name), req.rules());
     }
 
     @PatchMapping("/r/{name}/mod/users/{targetUserId}/flair")

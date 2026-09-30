@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.ColumnTransformer;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -28,6 +29,13 @@ public class Community {
 
     @Column(name = "subscriber_count", nullable = false)
     private int subscriberCount = 0;
+
+    // Human-readable sidebar rules (e.g. "1. Be civil") — a plain JSON string, same ColumnTransformer
+    // convention as AutomodRule.config/OutboxEvent.payload, parsed/built by CommunityService, not this
+    // entity. Deliberately separate from automod_rules, which is machine-evaluated filter config.
+    @ColumnTransformer(write = "?::jsonb")
+    @Column(columnDefinition = "jsonb", nullable = false)
+    private String rules = "[]";
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
@@ -78,6 +86,14 @@ public class Community {
 
     public void setSubscriberCount(int subscriberCount) {
         this.subscriberCount = subscriberCount;
+    }
+
+    public String getRules() {
+        return rules;
+    }
+
+    public void setRules(String rules) {
+        this.rules = rules;
     }
 
     public Instant getCreatedAt() {
