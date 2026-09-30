@@ -8,6 +8,7 @@ import com.redditclone.common.VoteDelta;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
 import com.redditclone.community.CommunityService;
+import com.redditclone.community.Flair;
 import com.redditclone.media.Media;
 import com.redditclone.media.MediaService;
 import com.redditclone.media.MediaView;
@@ -66,8 +67,8 @@ public class PostService {
         Boolean claimed = redis.opsForValue().setIfAbsent(key, newId.toString(), Duration.ofHours(24));
         if (!Boolean.TRUE.equals(claimed)) {
             String existingPostId = redis.opsForValue().get(key);
-            return attachMedia(posts.findById(UUID.fromString(existingPostId))
-                    .orElseThrow(() -> new NotFoundException("post not found")));
+            return attachFlair(attachMedia(posts.findById(UUID.fromString(existingPostId))
+                    .orElseThrow(() -> new NotFoundException("post not found"))));
         }
         try {
             communityService.requireNotBanned(authorId, communityId);
@@ -82,6 +83,12 @@ public class PostService {
             if (req.mediaId() != null) {
                 validatedMedia = mediaService.requireOwnedAndUsable(req.mediaId(), authorId, req.kind());
             }
+            // Same never-trust-a-client-id principle as mediaId above, applied to flair — always optional
+            // regardless of kind, so a null flairId is never rejected, only a present-but-invalid one.
+            Flair validatedFlair = null;
+            if (req.flairId() != null) {
+                validatedFlair = communityService.requireFlairUsable(communityId, req.flairId(), "post");
+            }
             String title = sanitizer.sanitize(req.title());
             String body = sanitizer.sanitize(req.body());
             Post p = new Post();
@@ -93,6 +100,7 @@ public class PostService {
             p.setBody(body);
             p.setUrl(req.url());
             p.setMediaId(req.mediaId());
+            p.setFlairId(req.flairId());
             // Unlike controversial_rank/rising_rank, hot_rank's formula isn't 0 at zero votes (it also
             // carries a time term) — without this, every new post sits at the column default of 0 until its
             // first vote, sorting below any post that's ever been voted on, regardless of how new it is.
@@ -105,6 +113,11 @@ public class PostService {
                 p.setRemoved(true);
             }
             posts.save(p);
+            if (validatedFlair != null) {
+                // Reuse the row requireFlairUsable already fetched instead of a second findAllById round
+                // trip a moment later via attachFlair() for a row that can't have changed since.
+                p.setFlair(validatedFlair);
+            }
             if (validatedMedia != null) {
                 // Reuse the row requireOwnedAndUsable already fetched instead of a second findAllById
                 // round trip a moment later via attachMedia() for a row that can't have changed since.
@@ -123,7 +136,7 @@ public class PostService {
     }
 
     public List<Post> findNewPage(UUID communityId, Instant cursorCreatedAt, UUID cursorId, UUID viewerId, int limit) {
-        return attachMedia(posts.findNewPage(communityId, cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit)));
+        return attachFlair(attachMedia(posts.findNewPage(communityId, cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit))));
     }
 
     // Deliberately does NOT attach media — used internally by other services (ban checks, comment-reply's
@@ -134,7 +147,7 @@ public class PostService {
     }
 
     public Post findByIdWithMedia(UUID postId) {
-        return attachMedia(findById(postId));
+        return attachFlair(attachMedia(findById(postId)));
     }
 
     // For ModerationService's human-initiated removal path — Post already has a public `removed` setter
@@ -155,7 +168,7 @@ public class PostService {
         }
         Map<UUID, Post> byId = new HashMap<>();
         posts.findAllById(rankedIds).forEach(p -> byId.put(p.getId(), p));
-        return attachMedia(rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList());
+        return attachFlair(attachMedia(rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList()));
     }
 
     public void incrementCommentCount(UUID postId) {
@@ -163,19 +176,19 @@ public class PostService {
     }
 
     public List<Post> findHotPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachMedia(posts.findHotPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+        return attachFlair(attachMedia(posts.findHotPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
     }
 
     public List<Post> findTopPage(UUID communityId, Instant since, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachMedia(posts.findTopPage(communityId, since, (int) cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+        return attachFlair(attachMedia(posts.findTopPage(communityId, since, (int) cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
     }
 
     public List<Post> findRisingPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachMedia(posts.findRisingPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+        return attachFlair(attachMedia(posts.findRisingPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
     }
 
     public List<Post> findControversialPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachMedia(posts.findControversialPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+        return attachFlair(attachMedia(posts.findControversialPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
     }
 
     // Single batched IN query, never N+1 — called at the end of every page-returning method above (plus
@@ -205,6 +218,48 @@ public class PostService {
             p.setMedia(mediaService.getMediaViews(Set.of(p.getMediaId())).get(p.getMediaId()));
         }
         return p;
+    }
+
+    // Same batched-IN-query, never-N+1 shape as attachMedia above, via CommunityService.getFlairs.
+    private List<Post> attachFlair(List<Post> page) {
+        Set<UUID> flairIds = new HashSet<>();
+        for (Post p : page) {
+            if (p.getFlairId() != null) {
+                flairIds.add(p.getFlairId());
+            }
+        }
+        if (flairIds.isEmpty()) {
+            return page;
+        }
+        Map<UUID, Flair> views = communityService.getFlairs(flairIds);
+        for (Post p : page) {
+            if (p.getFlairId() != null) {
+                p.setFlair(views.get(p.getFlairId()));
+            }
+        }
+        return page;
+    }
+
+    private Post attachFlair(Post p) {
+        if (p.getFlairId() != null) {
+            p.setFlair(communityService.getFlairs(Set.of(p.getFlairId())).get(p.getFlairId()));
+        }
+        return p;
+    }
+
+    // ModerationController pushes the PERM_MANAGE_FLAIRS check down before calling this — no permission
+    // check here, same convention as markRemoved above.
+    @Transactional
+    public void setFlair(UUID postId, UUID communityId, UUID flairId) {
+        Post p = findById(postId);
+        if (!p.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("post not found");
+        }
+        if (flairId != null) {
+            communityService.requireFlairUsable(communityId, flairId, "post");
+        }
+        p.setFlairId(flairId);
+        posts.save(p);
     }
 
     // Applies a batch of grouped vote deltas (one entry per post touched, not per vote — see

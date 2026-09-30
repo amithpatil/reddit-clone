@@ -1,5 +1,6 @@
 package com.redditclone.post;
 
+import com.redditclone.community.Flair;
 import com.redditclone.media.MediaView;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -41,6 +42,13 @@ public class Post {
     // path is automatically correct: media is attached before the listing is serialized and cached.
     @Transient
     private MediaView media;
+
+    @Column(name = "flair_id")
+    private UUID flairId;
+
+    // Populated by PostService.attachFlair(), same pattern/placement as media above.
+    @Transient
+    private Flair flair;
 
     @Column(nullable = false)
     private boolean nsfw;
@@ -157,6 +165,22 @@ public class Post {
 
     public void setMedia(MediaView media) {
         this.media = media;
+    }
+
+    public UUID getFlairId() {
+        return flairId;
+    }
+
+    public void setFlairId(UUID flairId) {
+        this.flairId = flairId;
+    }
+
+    public Flair getFlair() {
+        return flair;
+    }
+
+    public void setFlair(Flair flair) {
+        this.flair = flair;
     }
 
     public boolean isNsfw() {

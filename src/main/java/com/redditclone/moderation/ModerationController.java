@@ -1,18 +1,24 @@
 package com.redditclone.moderation;
 
 import com.redditclone.community.AutomodRule;
+import com.redditclone.community.CommunityModerator;
 import com.redditclone.community.CommunityService;
+import com.redditclone.community.Flair;
+import com.redditclone.community.dto.SetFlairRequest;
 import com.redditclone.moderation.dto.AddModeratorRequest;
 import com.redditclone.moderation.dto.AutomodRuleRequest;
 import com.redditclone.moderation.dto.BanRequest;
+import com.redditclone.moderation.dto.FlairRequest;
 import com.redditclone.moderation.dto.ModMailRequest;
 import com.redditclone.moderation.dto.MuteRequest;
 import com.redditclone.moderation.dto.RemoveRequest;
 import com.redditclone.moderation.dto.ReportRequest;
+import com.redditclone.post.PostService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -29,13 +35,15 @@ public class ModerationController {
     private final ModerationService moderation;
     private final ReportService reportService;
     private final CommunityService communityService;
+    private final PostService postService;
     private final ObjectMapper json;
 
     public ModerationController(ModerationService moderation, ReportService reportService,
-                                 CommunityService communityService, ObjectMapper json) {
+                                 CommunityService communityService, PostService postService, ObjectMapper json) {
         this.moderation = moderation;
         this.reportService = reportService;
         this.communityService = communityService;
+        this.postService = postService;
         this.json = json;
     }
 
@@ -129,6 +137,31 @@ public class ModerationController {
     @GetMapping("/r/{name}/mod/mail")
     public List<ModMailMessage> listModMail(@AuthenticationPrincipal UUID userId, @PathVariable String name) {
         return moderation.listModMail(userId, communityId(name));
+    }
+
+    @PostMapping("/r/{name}/mod/flairs")
+    public Flair addFlair(@AuthenticationPrincipal UUID userId, @PathVariable String name,
+                           @Valid @RequestBody FlairRequest req) {
+        return communityService.addFlair(userId, communityId(name), req.text(), req.color(), req.type());
+    }
+
+    @DeleteMapping("/r/{name}/mod/flairs/{flairId}")
+    public void removeFlair(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID flairId) {
+        communityService.removeFlair(userId, communityId(name), flairId);
+    }
+
+    @PatchMapping("/r/{name}/mod/users/{targetUserId}/flair")
+    public void setUserFlair(@AuthenticationPrincipal UUID userId, @PathVariable String name,
+                              @PathVariable UUID targetUserId, @RequestBody SetFlairRequest req) {
+        communityService.setUserFlair(userId, communityId(name), targetUserId, req.flairId());
+    }
+
+    @PatchMapping("/r/{name}/mod/posts/{postId}/flair")
+    public void setPostFlair(@AuthenticationPrincipal UUID userId, @PathVariable String name,
+                              @PathVariable UUID postId, @RequestBody SetFlairRequest req) {
+        UUID communityId = communityId(name);
+        communityService.requirePermission(userId, communityId, CommunityModerator.PERM_MANAGE_FLAIRS);
+        postService.setFlair(postId, communityId, req.flairId());
     }
 
     private UUID communityId(String name) {

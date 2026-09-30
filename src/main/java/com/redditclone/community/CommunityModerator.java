@@ -22,6 +22,7 @@ public class CommunityModerator {
     public static final int PERM_MUTE_USERS = 1 << 2;
     public static final int PERM_MANAGE_AUTOMOD = 1 << 3;
     public static final int PERM_MANAGE_MODERATORS = 1 << 4;
+    public static final int PERM_MANAGE_FLAIRS = 1 << 5;
     public static final int OWNER_PERMISSIONS = Integer.MAX_VALUE;
 
     @Id

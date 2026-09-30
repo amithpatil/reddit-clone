@@ -13,7 +13,8 @@ public record CreatePostRequest(
         @NotBlank @Size(max = 300) String title,
         @Size(max = 40000) String body,
         String url,
-        UUID mediaId
+        UUID mediaId,
+        UUID flairId
 ) {
 
     // Jakarta Bean Validation discovers any getter-shaped method (isXxx()/getXxx()) via reflection

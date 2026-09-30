@@ -8,6 +8,7 @@ import com.redditclone.common.paging.RankCursor;
 import com.redditclone.common.paging.RankCursorCodec;
 import com.redditclone.common.paging.Thing;
 import com.redditclone.community.CommunityService;
+import com.redditclone.community.Flair;
 import com.redditclone.post.dto.CreatePostRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
@@ -100,6 +101,18 @@ public class PostController {
 
     private ResponseEntity<String> jsonResponse(String body) {
         return ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(body);
+    }
+
+    // Public — a community's flair list is needed to render the submit-post flair picker, or a self-assign
+    // user-flair picker, before the caller has necessarily even logged in. type is optional; when present
+    // it must be "post" or "user", matching the flairs.type CHECK constraint.
+    @GetMapping("/flairs")
+    public List<Flair> flairs(@PathVariable String communityName, @RequestParam(required = false) String type) {
+        if (type != null && !type.equals("user") && !type.equals("post")) {
+            throw new BadRequestException("invalid flair type");
+        }
+        UUID communityId = communityService.findByName(communityName).getId();
+        return communityService.listFlairs(communityId, type);
     }
 
     // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key, see PostService.search.

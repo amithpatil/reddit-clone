@@ -25,6 +25,9 @@ public class Membership {
     @Column(name = "joined_at", nullable = false)
     private Instant joinedAt;
 
+    @Column(name = "flair_id")
+    private UUID flairId;
+
     public Membership() {
     }
 
@@ -56,5 +59,13 @@ public class Membership {
 
     public void setJoinedAt(Instant joinedAt) {
         this.joinedAt = joinedAt;
+    }
+
+    public UUID getFlairId() {
+        return flairId;
+    }
+
+    public void setFlairId(UUID flairId) {
+        this.flairId = flairId;
     }
 }

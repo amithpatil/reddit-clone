@@ -4,6 +4,7 @@ import com.redditclone.auth.AuthService;
 import com.redditclone.common.ModerationAuditWriter;
 import com.redditclone.common.SystemAccounts;
 import com.redditclone.common.UuidV7Generator;
+import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.ConflictException;
 import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
@@ -13,8 +14,11 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -36,6 +40,7 @@ public class CommunityService {
     private final CommunityModeratorRepository moderators;
     private final BanRepository bans;
     private final AutomodRuleRepository automodRules;
+    private final FlairRepository flairs;
     private final UuidV7Generator ids;
     private final ObjectMapper json;
     private final ModerationAuditWriter auditWriter;
@@ -49,13 +54,14 @@ public class CommunityService {
 
     public CommunityService(CommunityRepository communities, MembershipRepository memberships,
                              CommunityModeratorRepository moderators, BanRepository bans,
-                             AutomodRuleRepository automodRules, UuidV7Generator ids,
+                             AutomodRuleRepository automodRules, FlairRepository flairs, UuidV7Generator ids,
                              ObjectMapper json, ModerationAuditWriter auditWriter, AuthService authService) {
         this.communities = communities;
         this.memberships = memberships;
         this.moderators = moderators;
         this.bans = bans;
         this.automodRules = automodRules;
+        this.flairs = flairs;
         this.ids = ids;
         this.json = json;
         this.auditWriter = auditWriter;
@@ -290,5 +296,77 @@ public class CommunityService {
             future.cancel(true);
             return false;
         }
+    }
+
+    // ==================== Flair ====================
+
+    public List<Flair> listFlairs(UUID communityId, String type) {
+        return type == null ? flairs.findByCommunityId(communityId) : flairs.findByCommunityIdAndType(communityId, type);
+    }
+
+    @Transactional
+    public Flair addFlair(UUID actorId, UUID communityId, String text, String color, String type) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_FLAIRS);
+        Flair f = new Flair();
+        f.setId(ids.nextId());
+        f.setCommunityId(communityId);
+        f.setText(text);
+        f.setColor(color);
+        f.setType(type);
+        return flairs.save(f);
+    }
+
+    @Transactional
+    public void removeFlair(UUID actorId, UUID communityId, UUID flairId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_FLAIRS);
+        Flair f = flairs.findById(flairId).orElseThrow(() -> new NotFoundException("no such flair"));
+        if (!f.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("no such flair");
+        }
+        flairs.deleteById(flairId);
+    }
+
+    // Single validation chokepoint every flair-assignment path calls through — mirrors
+    // MediaService.requireOwnedAndUsable's role for media. 404s rather than leaking cross-community
+    // existence, same pattern as removeAutomodRule.
+    public Flair requireFlairUsable(UUID communityId, UUID flairId, String expectedType) {
+        Flair f = flairs.findById(flairId).orElseThrow(() -> new NotFoundException("no such flair"));
+        if (!f.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("no such flair");
+        }
+        if (!f.getType().equals(expectedType)) {
+            throw new BadRequestException("flair type mismatch: expected " + expectedType);
+        }
+        return f;
+    }
+
+    // Batched, never N+1 — same shape as MediaService.getMediaViews, used by PostService's listing methods.
+    public Map<UUID, Flair> getFlairs(Set<UUID> flairIds) {
+        Map<UUID, Flair> byId = new HashMap<>();
+        flairs.findAllById(flairIds).forEach(f -> byId.put(f.getId(), f));
+        return byId;
+    }
+
+    @Transactional
+    public void setOwnFlair(UUID userId, UUID communityId, UUID flairId) {
+        Membership m = memberships.findById(new MembershipId(userId, communityId))
+                .orElseThrow(() -> new NotFoundException("not a member of this community"));
+        if (flairId != null) {
+            requireFlairUsable(communityId, flairId, "user");
+        }
+        m.setFlairId(flairId);
+        memberships.save(m);
+    }
+
+    @Transactional
+    public void setUserFlair(UUID actorId, UUID communityId, UUID targetUserId, UUID flairId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_FLAIRS);
+        Membership m = memberships.findById(new MembershipId(targetUserId, communityId))
+                .orElseThrow(() -> new NotFoundException("target is not a member of this community"));
+        if (flairId != null) {
+            requireFlairUsable(communityId, flairId, "user");
+        }
+        m.setFlairId(flairId);
+        memberships.save(m);
     }
 }
