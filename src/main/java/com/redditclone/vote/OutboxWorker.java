@@ -1,0 +1,150 @@
+package com.redditclone.vote;
+
+import com.redditclone.auth.AuthService;
+import com.redditclone.comment.CommentService;
+import com.redditclone.common.KarmaEvent;
+import com.redditclone.common.UuidV7Generator;
+import com.redditclone.common.VoteDelta;
+import com.redditclone.post.PostService;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
+
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+// Drains outbox_events in the same process as the API for now (Phase 2 scope) rather than a separate
+// `worker` role process (the source plan's System architecture splits api/worker by env var — that's a
+// Phase 5/deployment concern, not attempted here). @Scheduled + ShedLock still make this safe to later
+// run alongside additional instances of the same process without double-processing a batch.
+@Component
+public class OutboxWorker {
+
+    private static final int BATCH_SIZE = 500;
+
+    private final JdbcTemplate jdbc;
+    private final PostService postService;
+    private final CommentService commentService;
+    private final AuthService authService;
+    private final KarmaLogRepository karmaLog;
+    private final UuidV7Generator ids;
+    private final ObjectMapper json;
+
+    public OutboxWorker(JdbcTemplate jdbc, PostService postService, CommentService commentService,
+                         AuthService authService, KarmaLogRepository karmaLog, UuidV7Generator ids,
+                         ObjectMapper json) {
+        this.jdbc = jdbc;
+        this.postService = postService;
+        this.commentService = commentService;
+        this.authService = authService;
+        this.karmaLog = karmaLog;
+        this.ids = ids;
+        this.json = json;
+    }
+
+    @Scheduled(fixedDelay = 2000)
+    @SchedulerLock(name = "outboxWorker", lockAtLeastFor = "1s", lockAtMostFor = "30s") // only one instance runs this at a time
+    @Transactional
+    public void processBatch() {
+        List<Map<String, Object>> events = jdbc.queryForList("""
+                SELECT id, event_type, payload FROM outbox_events
+                WHERE processed_at IS NULL
+                ORDER BY id
+                LIMIT %d
+                FOR UPDATE SKIP LOCKED
+                """.formatted(BATCH_SIZE));
+        if (events.isEmpty()) {
+            return;
+        }
+
+        // Grouping by target id before writing means many votes on the same post/comment in one tick
+        // become one UPDATE, not one per vote — see Voting, karma & outbox in the source plan.
+        Map<UUID, int[]> postAgg = new HashMap<>(); // {scoreDelta, upsDelta, downsDelta, eventCount}
+        Map<UUID, int[]> commentAgg = new HashMap<>();
+
+        for (Map<String, Object> event : events) {
+            String type = (String) event.get("event_type");
+            VoteEventPayload payload = parsePayload(event.get("payload").toString());
+            int[] delta = computeDelta(payload);
+            if (type.startsWith("post_vote")) {
+                accumulate(postAgg, payload.targetId(), delta);
+            } else if (type.startsWith("comment_vote")) {
+                accumulate(commentAgg, payload.targetId(), delta);
+            }
+        }
+
+        List<KarmaEvent> postKarma = postService.applyVoteDeltas(toVoteDeltas(postAgg));
+        List<KarmaEvent> commentKarma = commentService.applyVoteDeltas(toVoteDeltas(commentAgg));
+
+        applyKarma(postKarma, "post_vote", true);
+        applyKarma(commentKarma, "comment_vote", false);
+
+        jdbc.batchUpdate("UPDATE outbox_events SET processed_at = now() WHERE id = ?",
+                events.stream().map(e -> new Object[]{e.get("id")}).toList());
+    }
+
+    private VoteEventPayload parsePayload(String payloadJson) {
+        try {
+            return json.readValue(payloadJson, VoteEventPayload.class);
+        } catch (Exception e) {
+            throw new IllegalStateException("corrupt outbox payload: " + payloadJson, e);
+        }
+    }
+
+    // A "_cast" event with no prior vote (oldDirection null) is a fresh vote: delta = newDirection. One
+    // with a prior vote is a direction SWITCH (e.g. up -> down): delta = newDirection - oldDirection, a
+    // swing of 2, not 1 — the plan's own OutboxWorker sketch only ever applies +/-1 per cast event and
+    // silently under/over-counts a switched vote. A "_removed" event (newDirection null) reverses
+    // whatever oldDirection contributed: delta = -oldDirection, not the plan sketch's hard-coded 0 (which
+    // would mean an unvote never actually undoes its score/karma effect).
+    private int[] computeDelta(VoteEventPayload payload) {
+        int oldDir = payload.oldDirection() == null ? 0 : payload.oldDirection();
+        int newDir = payload.newDirection() == null ? 0 : payload.newDirection();
+        int scoreDelta = newDir - oldDir;
+        int upsDelta = (newDir == 1 ? 1 : 0) - (oldDir == 1 ? 1 : 0);
+        int downsDelta = (newDir == -1 ? 1 : 0) - (oldDir == -1 ? 1 : 0);
+        return new int[]{scoreDelta, upsDelta, downsDelta, 1};
+    }
+
+    private void accumulate(Map<UUID, int[]> agg, UUID targetId, int[] delta) {
+        agg.merge(targetId, delta, (a, b) -> new int[]{a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]});
+    }
+
+    private Map<UUID, VoteDelta> toVoteDeltas(Map<UUID, int[]> agg) {
+        Map<UUID, VoteDelta> out = new HashMap<>();
+        agg.forEach((id, d) -> out.put(id, new VoteDelta(d[0], d[1], d[2], d[3])));
+        return out;
+    }
+
+    // One karma_log row per post/comment that actually changed (append-only audit ledger), plus one
+    // grouped users.karma_post/karma_comment UPDATE per distinct author — not one UPDATE per row, in
+    // case a single batch touches several posts by the same author.
+    private void applyKarma(List<KarmaEvent> events, String reason, boolean isPost) {
+        if (events.isEmpty()) {
+            return;
+        }
+        Map<UUID, Integer> byUser = new HashMap<>();
+        for (KarmaEvent e : events) {
+            byUser.merge(e.userId(), e.delta(), Integer::sum);
+            KarmaLog log = new KarmaLog();
+            log.setId(ids.nextId());
+            log.setUserId(e.userId());
+            log.setDelta(e.delta());
+            log.setReason(reason);
+            log.setSourceId(e.sourceId());
+            karmaLog.save(log);
+        }
+        byUser.forEach((userId, delta) -> {
+            if (isPost) {
+                authService.applyPostKarmaDelta(userId, delta);
+            } else {
+                authService.applyCommentKarmaDelta(userId, delta);
+            }
+        });
+    }
+}

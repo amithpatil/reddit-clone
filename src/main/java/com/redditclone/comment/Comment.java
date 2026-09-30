@@ -47,6 +47,15 @@ public class Comment {
     @Column(nullable = false)
     private int score = 0;
 
+    @Column(nullable = false)
+    private int ups = 0;
+
+    @Column(nullable = false)
+    private int downs = 0;
+
+    @Column(name = "best_rank", nullable = false)
+    private double bestRank = 0;
+
     @Column(name = "child_count", nullable = false)
     private int childCount = 0;
 
@@ -116,8 +125,20 @@ public class Comment {
         return score;
     }
 
-    public void setScore(int score) {
-        this.score = score;
+    // No setter: score/ups/downs/best_rank are exclusively mutated via CommentService.applyVoteDeltas's
+    // raw-SQL bulk update, same reasoning as childCount — Hibernate still hydrates these fields on read
+    // via its own field access, no setter needed for that.
+
+    public int getUps() {
+        return ups;
+    }
+
+    public int getDowns() {
+        return downs;
+    }
+
+    public double getBestRank() {
+        return bestRank;
     }
 
     public int getChildCount() {

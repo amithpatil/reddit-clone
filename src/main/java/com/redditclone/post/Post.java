@@ -47,6 +47,21 @@ public class Post {
     private double hotRank = 0;
 
     @Column(nullable = false)
+    private int ups = 0;
+
+    @Column(nullable = false)
+    private int downs = 0;
+
+    @Column(name = "controversial_rank", nullable = false)
+    private double controversialRank = 0;
+
+    @Column(name = "rising_rank", nullable = false)
+    private double risingRank = 0;
+
+    @Column(name = "rising_updated_at", nullable = false)
+    private Instant risingUpdatedAt = Instant.now();
+
+    @Column(nullable = false)
     private boolean pinned;
 
     @Column(nullable = false)
@@ -152,8 +167,28 @@ public class Post {
         return hotRank;
     }
 
-    public void setHotRank(double hotRank) {
-        this.hotRank = hotRank;
+    // No setter: hot_rank/ups/downs/controversial_rank/rising_rank/rising_updated_at are exclusively
+    // mutated via PostService.applyVoteDeltas's raw-SQL bulk update, same reasoning as commentCount —
+    // Hibernate still hydrates these fields on read via its own field access, no setter needed for that.
+
+    public int getUps() {
+        return ups;
+    }
+
+    public int getDowns() {
+        return downs;
+    }
+
+    public double getControversialRank() {
+        return controversialRank;
+    }
+
+    public double getRisingRank() {
+        return risingRank;
+    }
+
+    public Instant getRisingUpdatedAt() {
+        return risingUpdatedAt;
     }
 
     public boolean isPinned() {

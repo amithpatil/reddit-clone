@@ -86,6 +86,23 @@ public class AuthService {
         return issueTokens(user, stored.getFamilyId());
     }
 
+    // Grouped karma deltas from a batch of vote events (see vote.OutboxWorker) — one bulk UPDATE per
+    // affected user, not per post/comment, same "grouped, not per-vote" principle as PostService/
+    // CommentService.applyVoteDeltas.
+    @Transactional
+    public void applyPostKarmaDelta(UUID userId, int delta) {
+        if (delta != 0) {
+            users.adjustKarmaPost(userId, delta);
+        }
+    }
+
+    @Transactional
+    public void applyCommentKarmaDelta(UUID userId, int delta) {
+        if (delta != 0) {
+            users.adjustKarmaComment(userId, delta);
+        }
+    }
+
     private TokenPair issueTokens(User user, UUID familyId) {
         String access = jwt.generateAccessToken(user);
         String rawRefresh = UUID.randomUUID().toString(); // the opaque refresh secret itself — a plain random UUID is fine here, it's never used as a sortable primary key

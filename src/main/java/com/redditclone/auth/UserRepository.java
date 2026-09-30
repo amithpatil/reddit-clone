@@ -1,6 +1,9 @@
 package com.redditclone.auth;
 
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -17,4 +20,12 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     boolean existsByUsername(String username);
 
     Optional<User> findByUsername(String username);
+
+    @Modifying
+    @Query("UPDATE User u SET u.karmaPost = u.karmaPost + :delta WHERE u.id = :id")
+    void adjustKarmaPost(@Param("id") UUID id, @Param("delta") int delta);
+
+    @Modifying
+    @Query("UPDATE User u SET u.karmaComment = u.karmaComment + :delta WHERE u.id = :id")
+    void adjustKarmaComment(@Param("id") UUID id, @Param("delta") int delta);
 }

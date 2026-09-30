@@ -26,4 +26,49 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     @Modifying
     @Query("UPDATE Post p SET p.commentCount = p.commentCount + 1 WHERE p.id = :id")
     void incrementCommentCount(@Param("id") UUID id);
+
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.communityId = :communityId AND p.removed = false
+              AND (p.hotRank < :cursorRank OR (p.hotRank = :cursorRank AND p.id < :cursorId))
+            ORDER BY p.hotRank DESC, p.id DESC
+            """)
+    List<Post> findHotPage(@Param("communityId") UUID communityId,
+                            @Param("cursorRank") double cursorRank,
+                            @Param("cursorId") UUID cursorId,
+                            Pageable limit);
+
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.communityId = :communityId AND p.removed = false AND p.createdAt >= :since
+              AND (p.score < :cursorScore OR (p.score = :cursorScore AND p.id < :cursorId))
+            ORDER BY p.score DESC, p.id DESC
+            """)
+    List<Post> findTopPage(@Param("communityId") UUID communityId,
+                            @Param("since") Instant since,
+                            @Param("cursorScore") int cursorScore,
+                            @Param("cursorId") UUID cursorId,
+                            Pageable limit);
+
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.communityId = :communityId AND p.removed = false
+              AND (p.risingRank < :cursorRank OR (p.risingRank = :cursorRank AND p.id < :cursorId))
+            ORDER BY p.risingRank DESC, p.id DESC
+            """)
+    List<Post> findRisingPage(@Param("communityId") UUID communityId,
+                               @Param("cursorRank") double cursorRank,
+                               @Param("cursorId") UUID cursorId,
+                               Pageable limit);
+
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.communityId = :communityId AND p.removed = false
+              AND (p.controversialRank < :cursorRank OR (p.controversialRank = :cursorRank AND p.id < :cursorId))
+            ORDER BY p.controversialRank DESC, p.id DESC
+            """)
+    List<Post> findControversialPage(@Param("communityId") UUID communityId,
+                                      @Param("cursorRank") double cursorRank,
+                                      @Param("cursorId") UUID cursorId,
+                                      Pageable limit);
 }
