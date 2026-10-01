@@ -1,11 +1,11 @@
-.card {
+.header {
   display: flex;
   gap: var(--space-3);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-4);
 }
 
 .body {
@@ -26,8 +26,8 @@
 
 .title {
   margin: 0 0 var(--space-2);
-  font-size: 16px;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 700;
   color: var(--color-text);
   line-height: 1.3;
 }
@@ -53,33 +53,23 @@
   border: 1px solid var(--color-text-secondary);
 }
 
-.flairChip {
-  display: inline-block;
-  font-size: 11px;
-  font-weight: 600;
-  padding: 2px 8px;
-  border-radius: var(--radius-full);
-  margin-left: var(--space-2);
-  vertical-align: middle;
-}
-
-.titleLink {
-  color: inherit;
-  text-decoration: none;
-}
-
-.titleLink:hover {
-  text-decoration: underline;
-}
-
 .footer {
-  display: inline-block;
   font-size: 12px;
-  font-weight: 600;
   color: var(--color-text-secondary);
-  text-decoration: none;
 }
 
-.footer:hover {
-  text-decoration: underline;
+.commentsSection {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+
+.state {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-text-secondary);
 }

@@ -1,6 +1,5 @@
 package com.redditclone.comment;
 
-import com.redditclone.comment.dto.CommentView;
 import com.redditclone.comment.dto.PostWithCommentsView;
 import com.redditclone.comment.dto.ReplyRequest;
 import com.redditclone.common.exception.NotFoundException;
@@ -52,7 +51,7 @@ public class CommentController {
         if (post.isRemoved() || !post.getCommunityId().equals(communityId)) {
             throw new NotFoundException("post not found");
         }
-        var comments = commentService.findTopLevel(postId, viewerId, sort).stream().map(CommentView::from).toList();
+        var comments = commentService.findCommentTree(postId, viewerId, sort);
         return new PostWithCommentsView(post, comments);
     }
 }

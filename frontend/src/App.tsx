@@ -3,6 +3,7 @@ import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
+import { PostDetail } from './pages/PostDetail';
 import { Register } from './pages/Register';
 
 function App() {
@@ -20,6 +21,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/r/:communityName/comments/:postId" element={<PostDetail />} />
       </Route>
     </Routes>
   );

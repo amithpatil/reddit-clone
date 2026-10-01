@@ -1,0 +1,60 @@
+.comment {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+}
+
+.voteColumn {
+  flex-shrink: 0;
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.meta {
+  font-size: 12px;
+  margin-bottom: var(--space-1);
+}
+
+.author {
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.time {
+  color: var(--color-text-secondary);
+}
+
+.text {
+  font-size: 14px;
+  color: var(--color-text);
+  margin: 0 0 var(--space-1);
+  white-space: pre-wrap;
+}
+
+.textRemoved {
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.replyToggle {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.replyToggle:hover {
+  color: var(--color-text);
+}
+
+.replies {
+  border-left: 2px solid var(--color-border);
+  padding-left: var(--space-3);
+  margin-left: var(--space-2);
+}

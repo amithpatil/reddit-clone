@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import org.hibernate.annotations.ColumnTransformer;
 
 import java.time.Instant;
@@ -40,6 +41,10 @@ public class Comment {
 
     @Column(name = "author_id", nullable = false)
     private UUID authorId;
+
+    // Populated by CommentService.attachAuthorUsernames(), same pattern/placement as Post.authorUsername.
+    @Transient
+    private String authorUsername;
 
     @Column(nullable = false)
     private String body;
@@ -114,6 +119,14 @@ public class Comment {
 
     public void setAuthorId(UUID authorId) {
         this.authorId = authorId;
+    }
+
+    public String getAuthorUsername() {
+        return authorUsername;
+    }
+
+    public void setAuthorUsername(String authorUsername) {
+        this.authorUsername = authorUsername;
     }
 
     public String getBody() {

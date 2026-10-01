@@ -1,6 +1,7 @@
 package com.redditclone.comment;
 
 import com.redditclone.auth.AuthService;
+import com.redditclone.comment.dto.CommentView;
 import com.redditclone.common.KarmaEvent;
 import com.redditclone.common.OutboxWriter;
 import com.redditclone.common.RankFormulas;
@@ -21,6 +22,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -166,10 +169,38 @@ public class CommentService {
         outbox.writeEvents("notification", payloads);
     }
 
-    // best is Reddit's own default (Wilson confidence, not raw score). Only sort diversity here — still
-    // capped at TOP_LEVEL_PAGE_SIZE with no cursor to fetch a second page; real pagination is feature 8's
-    // job (/api/morechildren), not this one's.
-    public List<Comment> findTopLevel(UUID postId, UUID viewerId, String sort) {
+    // best is Reddit's own default (Wilson confidence, not raw score). Builds a genuinely nested tree
+    // (CommentView.replies), not a flat top-level-only list — see F3's plan. Root comments are still
+    // capped at TOP_LEVEL_PAGE_SIZE with no cursor (real pagination is feature 8's job), but every reply
+    // beneath a root is fetched eagerly and sorted recursively at every depth with the same comparator
+    // logic as the root query's own ORDER BY, matching how Reddit itself sorts a whole thread, not just
+    // its first level.
+    public List<CommentView> findCommentTree(UUID postId, UUID viewerId, String sort) {
+        List<Comment> roots = findTopLevel(postId, viewerId, sort);
+        List<Comment> replies = comments.findRepliesByPostId(postId, viewerId);
+
+        List<Comment> all = new ArrayList<>(roots);
+        all.addAll(replies);
+        attachAuthorUsernames(all);
+
+        Map<UUID, List<Comment>> childrenByParent = new HashMap<>();
+        for (Comment c : replies) {
+            childrenByParent.computeIfAbsent(c.getParentId(), k -> new ArrayList<>()).add(c);
+        }
+        Comparator<Comment> comparator = comparatorFor(sort);
+        return roots.stream().map(r -> toViewRecursive(r, childrenByParent, comparator)).toList();
+    }
+
+    private CommentView toViewRecursive(Comment c, Map<UUID, List<Comment>> childrenByParent, Comparator<Comment> comparator) {
+        List<Comment> kids = childrenByParent.getOrDefault(c.getId(), List.of());
+        List<CommentView> childViews = kids.stream()
+                .sorted(comparator)
+                .map(k -> toViewRecursive(k, childrenByParent, comparator))
+                .toList();
+        return CommentView.from(c, childViews);
+    }
+
+    private List<Comment> findTopLevel(UUID postId, UUID viewerId, String sort) {
         Pageable limit = Pageable.ofSize(TOP_LEVEL_PAGE_SIZE);
         return switch (sort) {
             case "best" -> comments.findTopLevelByBest(postId, viewerId, limit);
@@ -179,6 +210,42 @@ public class CommentService {
             case "controversial" -> comments.findTopLevelByControversial(postId, viewerId, limit);
             default -> throw new BadRequestException("invalid comment sort");
         };
+    }
+
+    // Mirrors each findTopLevelBy*'s own ORDER BY exactly, as a Java Comparator — used to sort each
+    // reply group (a comment's direct children) at every depth of the tree above, since there's no SQL
+    // query shaped to sort an arbitrary-depth tree recursively. Root comments don't need this: the
+    // findTopLevelBy* query above already returns them in the right order.
+    private Comparator<Comment> comparatorFor(String sort) {
+        return switch (sort) {
+            case "best" -> Comparator.comparingDouble(Comment::getBestRank).reversed()
+                    .thenComparing(Comparator.comparing(Comment::getId).reversed());
+            case "top" -> Comparator.comparingInt(Comment::getScore).reversed()
+                    .thenComparing(Comparator.comparing(Comment::getId).reversed());
+            case "new" -> Comparator.comparing(Comment::getCreatedAt).reversed()
+                    .thenComparing(Comparator.comparing(Comment::getId).reversed());
+            case "old" -> Comparator.comparing(Comment::getCreatedAt).thenComparing(Comment::getId);
+            case "controversial" -> Comparator.comparingDouble(Comment::getControversialRank).reversed()
+                    .thenComparing(Comparator.comparing(Comment::getId).reversed());
+            default -> throw new BadRequestException("invalid comment sort");
+        };
+    }
+
+    // Same batched-IN-query shape as PostService.attachAuthorUsername, via the same AuthService method —
+    // called once across both roots and replies combined, not per level, so a thread with many commenters
+    // still costs exactly one extra query regardless of its depth or shape.
+    private void attachAuthorUsernames(List<Comment> allComments) {
+        if (allComments.isEmpty()) {
+            return;
+        }
+        Set<UUID> authorIds = new HashSet<>();
+        for (Comment c : allComments) {
+            authorIds.add(c.getAuthorId());
+        }
+        Map<UUID, String> usernames = authService.findUsernamesByIds(authorIds);
+        for (Comment c : allComments) {
+            c.setAuthorUsername(usernames.get(c.getAuthorId()));
+        }
     }
 
     public Comment findById(UUID commentId) {

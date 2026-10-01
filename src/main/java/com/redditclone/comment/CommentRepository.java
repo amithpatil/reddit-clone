@@ -17,9 +17,13 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     // despite the smaller net score, because the larger sample gives more confidence in the ratio.
     // The NOT EXISTS/HiddenItem clause is the same viewer-scoped, ArchUnit-invisible JPQL pattern used in
     // PostRepository — see its comment. viewerId is null for an unauthenticated request.
+    // No "AND c.removed = false" here (unlike before F3): a removed root comment must still appear — as
+    // "[removed]", see CommentView — so any replies underneath it stay attached in the nested tree F3
+    // builds (CommentService.findCommentTree). Excluding the row entirely would silently orphan its whole
+    // reply subtree once replies became readable at all, which they weren't until F3.
     @Query("""
             SELECT c FROM Comment c
-            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+            WHERE c.postId = :postId AND c.parentId IS NULL
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.bestRank DESC, c.id DESC
@@ -28,7 +32,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
     @Query("""
             SELECT c FROM Comment c
-            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+            WHERE c.postId = :postId AND c.parentId IS NULL
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.score DESC, c.id DESC
@@ -37,7 +41,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
     @Query("""
             SELECT c FROM Comment c
-            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+            WHERE c.postId = :postId AND c.parentId IS NULL
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.createdAt DESC, c.id DESC
@@ -48,7 +52,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     // sort has a consistent direction to compare against — see the comment sort feature's plan.
     @Query("""
             SELECT c FROM Comment c
-            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+            WHERE c.postId = :postId AND c.parentId IS NULL
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.createdAt ASC, c.id ASC
@@ -57,12 +61,26 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
     @Query("""
             SELECT c FROM Comment c
-            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+            WHERE c.postId = :postId AND c.parentId IS NULL
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.controversialRank DESC, c.id DESC
             """)
     List<Comment> findTopLevelByControversial(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    // Every non-root comment for the post, unfiltered by `removed` for the same reason as the root queries
+    // above. No pagination and no ORDER BY — CommentService.findCommentTree groups these by parentId and
+    // sorts each sibling group in Java with the comparator matching the chosen sort, so the DB order here
+    // doesn't matter. Unbounded is an accepted, deliberate scope boundary (bounded naturally by the
+    // existing MAX_DEPTH=10 cap on reply depth) — real pagination/lazy-loading for huge threads is still
+    // backend feature 8's job, not this one's.
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.postId = :postId AND c.parentId IS NOT NULL
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            """)
+    List<Comment> findRepliesByPostId(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
 
     // clearAutomatically: without it, a `parent` entity already loaded in this transaction (see
     // CommentService.reply) keeps its stale pre-increment childCount in the persistence context, and a

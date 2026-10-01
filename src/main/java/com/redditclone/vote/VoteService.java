@@ -95,6 +95,16 @@ public class VoteService {
                 .collect(Collectors.toMap(PostVote::getPostId, PostVote::getDirection));
     }
 
+    // Comment counterpart of getMyPostVotes above, same reasoning — needed now that F3's comment tree
+    // renders vote arrows for comments too.
+    public Map<UUID, Short> getMyCommentVotes(UUID userId, Collection<UUID> commentIds) {
+        if (commentIds.isEmpty()) {
+            return Map.of();
+        }
+        return commentVotes.findByUserIdAndCommentIdIn(userId, commentIds).stream()
+                .collect(Collectors.toMap(CommentVote::getCommentId, CommentVote::getDirection));
+    }
+
     private void requireDirection(short direction) {
         if (direction != 1 && direction != -1) {
             throw new BadRequestException("dir must be 1 or -1");

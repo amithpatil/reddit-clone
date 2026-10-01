@@ -5,9 +5,14 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 public interface CommentVoteRepository extends JpaRepository<CommentVote, CommentVoteId> {
+
+    // Read by VoteService.getMyCommentVotes — mirrors PostVoteRepository.findByUserIdAndPostIdIn exactly.
+    List<CommentVote> findByUserIdAndCommentIdIn(UUID userId, Collection<UUID> commentIds);
 
     @Modifying
     @Query(value = """

@@ -35,16 +35,16 @@ public class VoteController {
         }
     }
 
-    // Lets the frontend render correct vote-arrow state after a reload — the feed endpoints themselves
-    // can't carry this (see VoteService.getMyPostVotes for why). Scoped to targetType=post only for now;
-    // comment vote-state isn't needed until the comment-tree UI (F3) is built.
+    // Lets the frontend render correct vote-arrow state after a reload — the feed/comment-tree endpoints
+    // themselves can't carry this (see VoteService.getMyPostVotes for why).
     @GetMapping("/mine")
     public Map<UUID, Short> myVotes(@AuthenticationPrincipal UUID userId, @RequestParam String targetType,
                                      @RequestParam List<UUID> targetIds) {
-        if (!"post".equals(targetType)) {
-            throw new BadRequestException("targetType=comment is not yet supported");
-        }
-        return voteService.getMyPostVotes(userId, targetIds);
+        return switch (targetType) {
+            case "post" -> voteService.getMyPostVotes(userId, targetIds);
+            case "comment" -> voteService.getMyCommentVotes(userId, targetIds);
+            default -> throw new BadRequestException("targetType must be post or comment");
+        };
     }
 
     @DeleteMapping
