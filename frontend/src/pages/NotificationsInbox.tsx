@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { NotificationPrefsForm } from '../components/NotificationPrefsForm';
+import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import { useNotifications } from '../notifications/NotificationsContext';
 import type { NotificationItem } from '../types/notification';
@@ -10,14 +11,15 @@ import styles from './NotificationsInbox.module.css';
 // feature today, same "no link for those today" limitation F8 already accepted for reported comments.
 function describe(n: NotificationItem): { text: string; href: string | null } {
   const actor = n.actorUsername ?? '[deleted]';
+  const postTitle = decodeHtmlEntities(n.postTitle) ?? '[deleted]';
   const postHref = n.communityName && n.source.postId ? `/r/${n.communityName}/comments/${n.source.postId}` : null;
   switch (n.type) {
     case 'post_reply':
-      return { text: `u/${actor} commented on your post "${n.postTitle ?? '[deleted]'}"`, href: postHref };
+      return { text: `u/${actor} commented on your post "${postTitle}"`, href: postHref };
     case 'reply':
-      return { text: `u/${actor} replied to your comment on "${n.postTitle ?? '[deleted]'}"`, href: postHref };
+      return { text: `u/${actor} replied to your comment on "${postTitle}"`, href: postHref };
     case 'mention':
-      return { text: `u/${actor} mentioned you on "${n.postTitle ?? '[deleted]'}"`, href: postHref };
+      return { text: `u/${actor} mentioned you on "${postTitle}"`, href: postHref };
     case 'chat_message':
       return { text: `u/${actor} sent you a message`, href: null };
     default:

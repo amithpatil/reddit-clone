@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { decodeHtmlEntities } from '../lib/html';
 import { useSettings } from '../settings/SettingsContext';
 import type { Post } from '../types/post';
 import styles from './PostMedia.module.css';
@@ -34,7 +35,7 @@ function renderContent(post: Post, fullBody: boolean) {
   }
   if (post.kind === 'text' && post.body) {
     const snippetClass = fullBody ? styles.snippet : `${styles.snippet} ${styles.snippetTruncated}`;
-    return <p className={snippetClass}>{post.body}</p>;
+    return <p className={snippetClass}>{decodeHtmlEntities(post.body)}</p>;
   }
   return null;
 }

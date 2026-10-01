@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useModQueue } from '../hooks/useModQueue';
+import { decodeHtmlEntities } from '../lib/html';
 import { dismissReport, fetchReportsForTarget, resolveReport } from '../lib/moderationApi';
 import { timeAgo } from '../lib/time';
 import { hasPermission, PERM_REMOVE_CONTENT } from '../types/moderation';
@@ -103,6 +104,8 @@ function QueueRow({ item, communityName, canAct, onRemove, onReportHandled }: Qu
     }
   };
 
+  const preview = decodeHtmlEntities(item.preview) ?? '[content removed]';
+
   return (
     <article className={styles.row}>
       <div className={styles.rowHeader}>
@@ -111,7 +114,7 @@ function QueueRow({ item, communityName, canAct, onRemove, onReportHandled }: Qu
         <span className={styles.time}>first reported {timeAgo(item.firstReportedAt)}</span>
       </div>
       <p className={styles.preview}>
-        {postHref ? <Link to={postHref}>{item.preview ?? '[content removed]'}</Link> : (item.preview ?? '[content removed]')}
+        {postHref ? <Link to={postHref}>{preview}</Link> : preview}
       </p>
       <div className={styles.meta}>by u/{item.authorUsername ?? '[deleted]'}</div>
       <div className={styles.actions}>

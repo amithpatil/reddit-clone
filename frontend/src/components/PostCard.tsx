@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import type { Post } from '../types/post';
 import { PostMedia } from './PostMedia';
@@ -35,7 +36,7 @@ export function PostCard({ post, onVote }: PostCardProps) {
         <h2 className={styles.title}>
           {post.pinned && <span className={`${styles.badge} ${styles.badgePinned}`}>📌 Pinned</span>}
           <Link className={styles.titleLink} to={detailHref}>
-            {post.title}
+            {decodeHtmlEntities(post.title)}
           </Link>
           {post.nsfw && <span className={`${styles.badge} ${styles.badgeNsfw}`}>NSFW</span>}
           {post.spoiler && <span className={`${styles.badge} ${styles.badgeSpoiler}`}>Spoiler</span>}

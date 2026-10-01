@@ -5,6 +5,7 @@ import { PostMedia } from '../components/PostMedia';
 import { ReplyBox } from '../components/ReplyBox';
 import { VoteControl } from '../components/VoteControl';
 import { usePostDetail } from '../hooks/usePostDetail';
+import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import type { CommentSortType } from '../types/comment';
 import styles from './PostDetail.module.css';
@@ -48,7 +49,7 @@ export function PostDetail() {
             · {timeAgo(post.createdAt)}
           </div>
           <h1 className={styles.title}>
-            {post.title}
+            {decodeHtmlEntities(post.title)}
             {post.nsfw && <span className={`${styles.badge} ${styles.badgeNsfw}`}>NSFW</span>}
             {post.spoiler && <span className={`${styles.badge} ${styles.badgeSpoiler}`}>Spoiler</span>}
           </h1>

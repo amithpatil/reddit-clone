@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import type { UserComment } from '../types/comment';
 import { VoteControl } from './VoteControl';
@@ -21,7 +22,7 @@ export function ProfileCommentRow({ comment, onVote }: ProfileCommentRowProps) {
         <div className={styles.meta}>
           commented on{' '}
           <Link className={styles.postLink} to={postHref}>
-            {comment.postTitle ?? '[deleted post]'}
+            {decodeHtmlEntities(comment.postTitle) ?? '[deleted post]'}
           </Link>{' '}
           in{' '}
           <Link className={styles.communityLink} to={`/r/${comment.communityName}`}>
@@ -29,7 +30,7 @@ export function ProfileCommentRow({ comment, onVote }: ProfileCommentRowProps) {
           </Link>{' '}
           · {timeAgo(comment.createdAt)}
         </div>
-        <p className={styles.text}>{comment.body}</p>
+        <p className={styles.text}>{decodeHtmlEntities(comment.body)}</p>
       </div>
     </article>
   );

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatContext';
+import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import styles from './ChatRoom.module.css';
 
@@ -89,7 +90,7 @@ export function ChatRoom() {
                 <div key={m.id} className={`${styles.messageRow} ${own ? styles.own : ''}`}>
                   <div className={styles.bubble}>
                     {!own && <div className={styles.sender}>{m.senderUsername ?? '[deleted]'}</div>}
-                    <div className={styles.body}>{m.body}</div>
+                    <div className={styles.body}>{decodeHtmlEntities(m.body)}</div>
                     <div className={styles.time}>{timeAgo(m.createdAt)}</div>
                   </div>
                 </div>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { useChat } from '../chat/ChatContext';
 import { ApiError } from '../lib/apiClient';
+import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import styles from './ChatRoomList.module.css';
 
@@ -65,12 +66,13 @@ export function ChatRoomList() {
       ) : (
         <div className={styles.list}>
           {rooms.map((r) => {
+            const lastMessage = decodeHtmlEntities(r.lastMessageBody);
             const preview =
-              r.lastMessageBody === null
+              lastMessage === null
                 ? ''
                 : r.lastMessageSenderId === user?.id
-                  ? `You: ${r.lastMessageBody}`
-                  : r.lastMessageBody;
+                  ? `You: ${lastMessage}`
+                  : lastMessage;
             return (
               <Link key={r.roomId} to={`/chat/${r.roomId}`} className={`${styles.row} ${r.unreadCount > 0 ? styles.unread : ''}`}>
                 <div className={styles.rowMain}>

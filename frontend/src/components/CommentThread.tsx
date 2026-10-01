@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import type { CommentNode } from '../types/comment';
 import { ReplyBox } from './ReplyBox';
@@ -40,7 +41,7 @@ export function CommentThread({ comment, onVote, onReply }: CommentThreadProps) 
             )}{' '}
             <span className={styles.time}>· {timeAgo(comment.createdAt)}</span>
           </div>
-          <p className={comment.removed ? `${styles.text} ${styles.textRemoved}` : styles.text}>{comment.body}</p>
+          <p className={comment.removed ? `${styles.text} ${styles.textRemoved}` : styles.text}>{decodeHtmlEntities(comment.body)}</p>
           {comment.depth < MAX_DEPTH && (
             <button type="button" className={styles.replyToggle} onClick={() => setReplying((r) => !r)}>
               Reply
