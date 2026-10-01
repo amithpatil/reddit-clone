@@ -35,12 +35,24 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // Sitewide "r/all" counterpart of findNewPage above — identical keyset ordering and hidden-items
     // filter, just without the single-community predicate. See PostController/PostService for how the
     // "all" pseudo-community name routes here instead of the per-community method.
+    // Private-community exclusion mirrors CommunityService.requireViewAccess's own "non-private, or a
+    // member, or any moderator" rule, done in bulk since there's no single community to call that
+    // per-community check against — same shape as searchAllIds below, translated to JPQL. Referencing
+    // Community/Membership/CommunityModerator by simple class name here is a standard JPQL subquery
+    // against another mapped entity (Hibernate resolves it against the global metamodel), not a Java
+    // import, so it creates no compile-time post -> community dependency and no ModuleBoundaryTest cycle
+    // risk — same precedent as the HiddenItem subquery just above. A NULL :viewerId (anonymous) never
+    // satisfies either EXISTS, so anonymous viewers correctly see only non-private posts with no extra
+    // IS NULL special-casing needed.
     @Query("""
             SELECT p FROM Post p
             WHERE p.removed = false
               AND (p.createdAt < :cursorCreatedAt OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
+              AND (NOT EXISTS (SELECT 1 FROM Community cm WHERE cm.id = p.communityId AND cm.type = 'private')
+                   OR EXISTS (SELECT 1 FROM Membership m WHERE m.userId = :viewerId AND m.communityId = p.communityId)
+                   OR EXISTS (SELECT 1 FROM CommunityModerator cmod WHERE cmod.userId = :viewerId AND cmod.communityId = p.communityId))
             ORDER BY p.createdAt DESC, p.id DESC
             """)
     List<Post> findNewAllPage(@Param("cursorCreatedAt") Instant cursorCreatedAt,
@@ -53,13 +65,20 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     void incrementCommentCount(@Param("id") UUID id);
 
     // A user's own "submitted" tab (F7) — identical shape to findNewAllPage (same removed/HiddenItem
-    // filters, same (createdAt, id) keyset order), scoped by author instead of sitewide.
+    // filters, same (createdAt, id) keyset order), scoped by author instead of sitewide. Also carries the
+    // same private-community exclusion as the "All" queries below (this is a public endpoint spanning every
+    // community the author has ever posted in, the same leak risk as a sitewide listing) — see
+    // findNewAllPage's comment for why the Community/Membership/CommunityModerator references below are
+    // safe.
     @Query("""
             SELECT p FROM Post p
             WHERE p.authorId = :authorId AND p.removed = false
               AND (p.createdAt < :cursorCreatedAt OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
+              AND (NOT EXISTS (SELECT 1 FROM Community cm WHERE cm.id = p.communityId AND cm.type = 'private')
+                   OR EXISTS (SELECT 1 FROM Membership m WHERE m.userId = :viewerId AND m.communityId = p.communityId)
+                   OR EXISTS (SELECT 1 FROM CommunityModerator cmod WHERE cmod.userId = :viewerId AND cmod.communityId = p.communityId))
             ORDER BY p.createdAt DESC, p.id DESC
             """)
     List<Post> findByAuthorId(@Param("authorId") UUID authorId,
@@ -82,12 +101,16 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
                             @Param("viewerId") UUID viewerId,
                             Pageable limit);
 
+    // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
             WHERE p.removed = false
               AND (p.hotRank < :cursorRank OR (p.hotRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
+              AND (NOT EXISTS (SELECT 1 FROM Community cm WHERE cm.id = p.communityId AND cm.type = 'private')
+                   OR EXISTS (SELECT 1 FROM Membership m WHERE m.userId = :viewerId AND m.communityId = p.communityId)
+                   OR EXISTS (SELECT 1 FROM CommunityModerator cmod WHERE cmod.userId = :viewerId AND cmod.communityId = p.communityId))
             ORDER BY p.hotRank DESC, p.id DESC
             """)
     List<Post> findHotAllPage(@Param("cursorRank") double cursorRank,
@@ -110,12 +133,16 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
                             @Param("viewerId") UUID viewerId,
                             Pageable limit);
 
+    // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
             WHERE p.removed = false AND p.createdAt >= :since
               AND (p.score < :cursorScore OR (p.score = :cursorScore AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
+              AND (NOT EXISTS (SELECT 1 FROM Community cm WHERE cm.id = p.communityId AND cm.type = 'private')
+                   OR EXISTS (SELECT 1 FROM Membership m WHERE m.userId = :viewerId AND m.communityId = p.communityId)
+                   OR EXISTS (SELECT 1 FROM CommunityModerator cmod WHERE cmod.userId = :viewerId AND cmod.communityId = p.communityId))
             ORDER BY p.score DESC, p.id DESC
             """)
     List<Post> findTopAllPage(@Param("since") Instant since,
@@ -138,12 +165,16 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
                                @Param("viewerId") UUID viewerId,
                                Pageable limit);
 
+    // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
             WHERE p.removed = false
               AND (p.risingRank < :cursorRank OR (p.risingRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
+              AND (NOT EXISTS (SELECT 1 FROM Community cm WHERE cm.id = p.communityId AND cm.type = 'private')
+                   OR EXISTS (SELECT 1 FROM Membership m WHERE m.userId = :viewerId AND m.communityId = p.communityId)
+                   OR EXISTS (SELECT 1 FROM CommunityModerator cmod WHERE cmod.userId = :viewerId AND cmod.communityId = p.communityId))
             ORDER BY p.risingRank DESC, p.id DESC
             """)
     List<Post> findRisingAllPage(@Param("cursorRank") double cursorRank,
@@ -165,12 +196,16 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
                                       @Param("viewerId") UUID viewerId,
                                       Pageable limit);
 
+    // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
             WHERE p.removed = false
               AND (p.controversialRank < :cursorRank OR (p.controversialRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
+              AND (NOT EXISTS (SELECT 1 FROM Community cm WHERE cm.id = p.communityId AND cm.type = 'private')
+                   OR EXISTS (SELECT 1 FROM Membership m WHERE m.userId = :viewerId AND m.communityId = p.communityId)
+                   OR EXISTS (SELECT 1 FROM CommunityModerator cmod WHERE cmod.userId = :viewerId AND cmod.communityId = p.communityId))
             ORDER BY p.controversialRank DESC, p.id DESC
             """)
     List<Post> findControversialAllPage(@Param("cursorRank") double cursorRank,

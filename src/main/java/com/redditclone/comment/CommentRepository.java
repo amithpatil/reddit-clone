@@ -97,12 +97,26 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     // per-post root queries above, there's no parentId IS NULL restriction: Reddit's own Comments tab
     // shows replies too). Same HiddenItem viewer filter and unremoved-only convention as every other
     // listing query in this codebase.
+    // Private-community exclusion: same bug class and fix as post.PostRepository's findByAuthorId/
+    // "All" queries — this is a public, cross-community listing with no filter on the comment's own
+    // community, so a comment made in a private community the viewer isn't a member/moderator of must be
+    // excluded. Comment only carries postId, not communityId, so this goes one hop further than the post
+    // side: Post/Community/Membership/CommunityModerator are all referenced as bare JPQL entity names
+    // (the comment module already legitimately depends on post at the Java level via PostService, so this
+    // is even more clearly safe than the equivalent post-side subquery — see that file's comment for the
+    // no-Java-import, no-ModuleBoundaryTest-risk reasoning). A comment whose postId matches no real post
+    // (comments.post_id has no FK constraint by design, see Phase 1's own notes) can't satisfy any of
+    // these EXISTS checks either way, so it stays visible — same fail-open behavior as today for that
+    // edge case, not a new risk.
     @Query("""
             SELECT c FROM Comment c
             WHERE c.authorId = :authorId AND c.removed = false
               AND (c.createdAt < :cursorCreatedAt OR (c.createdAt = :cursorCreatedAt AND c.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+              AND (NOT EXISTS (SELECT 1 FROM Post p, Community cm WHERE p.id = c.postId AND cm.id = p.communityId AND cm.type = 'private')
+                   OR EXISTS (SELECT 1 FROM Post p, Membership m WHERE p.id = c.postId AND m.communityId = p.communityId AND m.userId = :viewerId)
+                   OR EXISTS (SELECT 1 FROM Post p, CommunityModerator cmod WHERE p.id = c.postId AND cmod.communityId = p.communityId AND cmod.userId = :viewerId))
             ORDER BY c.createdAt DESC, c.id DESC
             """)
     List<Comment> findByAuthorId(@Param("authorId") UUID authorId,
