@@ -273,6 +273,16 @@ public class AuthService {
         }
     }
 
+    // Revokes only the family tied to this one refresh token ("log out of this device"), not every
+    // session the user has — revokeAllForUser (ban/delete) is the deliberately broader sibling. A
+    // missing/unknown/already-revoked token is a silent no-op: logout must always succeed from the
+    // client's perspective even if the cookie is stale or absent.
+    @Transactional
+    public void logout(String rawRefreshToken) {
+        refreshTokens.findByTokenHash(sha256(rawRefreshToken))
+                .ifPresent(stored -> refreshTokens.revokeFamily(stored.getFamilyId()));
+    }
+
     private TokenPair issueTokens(User user, UUID familyId) {
         String access = jwt.generateAccessToken(user);
         String rawRefresh = UUID.randomUUID().toString(); // the opaque refresh secret itself — a plain random UUID is fine here, it's never used as a sortable primary key

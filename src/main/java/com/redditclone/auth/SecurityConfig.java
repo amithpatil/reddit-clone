@@ -1,6 +1,7 @@
 package com.redditclone.auth;
 
 import jakarta.servlet.DispatcherType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -13,6 +14,11 @@ import org.springframework.security.crypto.argon2.Argon2PasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -23,9 +29,27 @@ public class SecurityConfig {
         return new Argon2PasswordEncoder(16, 32, 1, 19456, 2); // tuned for ~100-200ms
     }
 
+    // The frontend SPA runs on a different origin (Vite dev server) than the API, and sends the
+    // httpOnly refresh-token cookie on the refresh call — allowCredentials requires an explicit origin
+    // allowlist, a wildcard "*" is rejected by browsers once credentials are involved.
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter) throws Exception {
+    public CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origins}") String allowedOrigins) {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        config.setAllowCredentials(true);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", config);
+        return source;
+    }
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter,
+                                            CorsConfigurationSource corsConfigurationSource) throws Exception {
         http.csrf(csrf -> csrf.disable()) // bearer-token API, not cookie-session based
+                .cors(cors -> cors.configurationSource(corsConfigurationSource))
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 // Spring Security's default anonymous-authentication + access-denied handling returns 403
                 // for a missing/invalid token on an authenticated-only route; a bearer-token API should
@@ -39,7 +63,8 @@ public class SecurityConfig {
                         // one and masks the real 500 behind a misleading 401 (found by hitting exactly this
                         // case: an ArithmeticException deep in a query surfaced as a bare 401 to the client).
                         .dispatcherTypeMatchers(DispatcherType.ERROR).permitAll()
-                        .requestMatchers("/api/v1/register", "/api/v1/access_token", "/api/v1/access_token/refresh")
+                        .requestMatchers("/api/v1/register", "/api/v1/access_token", "/api/v1/access_token/refresh",
+                                "/api/v1/logout")
                         .permitAll()
                         // Reddit's real API lets anyone browse without a token — only actions (vote, submit,
                         // comment, subscribe, save, chat, delete) require one. jwtFilter still runs on these

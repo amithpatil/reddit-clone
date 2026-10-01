@@ -50,6 +50,8 @@ app:
     max-message-length: ${CHAT_MAX_MESSAGE_LENGTH:4000}
   moderation:
     max-pinned-posts: ${MAX_PINNED_POSTS:2}   # old Reddit's historical sticky-post cap
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5174}   # Vite dev server (fixed port, see frontend/vite.config.ts)
 
 management:
   endpoints:

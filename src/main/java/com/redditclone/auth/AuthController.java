@@ -45,6 +45,21 @@ public class AuthController {
         return withRefreshCookie(tokens);
     }
 
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(@CookieValue(name = REFRESH_COOKIE, required = false) String refreshToken) {
+        if (refreshToken != null) {
+            auth.logout(refreshToken);
+        }
+        ResponseCookie expired = ResponseCookie.from(REFRESH_COOKIE, "")
+                .httpOnly(true)
+                .secure(false) // flip to true once Caddy/TLS terminates the connection (Phase 5)
+                .sameSite("Strict")
+                .path("/api/v1")
+                .maxAge(0)
+                .build();
+        return ResponseEntity.ok().header(HttpHeaders.SET_COOKIE, expired.toString()).build();
+    }
+
     private ResponseEntity<AuthResponse> withRefreshCookie(TokenPair tokens) {
         ResponseCookie cookie = ResponseCookie.from(REFRESH_COOKIE, tokens.rawRefreshToken())
                 .httpOnly(true)
