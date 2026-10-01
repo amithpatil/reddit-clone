@@ -1,0 +1,54 @@
+import type { Community, CommunityRule } from '../types/community';
+import { JoinButton } from './JoinButton';
+import styles from './CommunitySidebar.module.css';
+
+interface CommunitySidebarProps {
+  community: Community;
+  rules: CommunityRule[];
+  actionError: string | null;
+  onJoin: () => void;
+  onLeave: () => void;
+  onRequestJoin: () => void;
+}
+
+export function CommunitySidebar({ community, rules, actionError, onJoin, onLeave, onRequestJoin }: CommunitySidebarProps) {
+  const createdDate = new Date(community.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
+
+  return (
+    <aside className={styles.sidebar}>
+      <div className={styles.header}>
+        <h2 className={styles.name}>
+          r/{community.name}
+          {community.isModerator && <span className={styles.modBadge}>Mod</span>}
+        </h2>
+      </div>
+      {community.description && <p className={styles.description}>{community.description}</p>}
+      <div className={styles.stats}>
+        <div>
+          <span className={styles.statValue}>{community.subscriberCount}</span>
+          members
+        </div>
+        <div>
+          <span className={styles.statValue}>Created</span>
+          {createdDate}
+        </div>
+      </div>
+      <JoinButton community={community} onJoin={onJoin} onLeave={onLeave} onRequestJoin={onRequestJoin} />
+      {actionError && <p className={styles.actionError}>{actionError}</p>}
+
+      {rules.length > 0 && (
+        <>
+          <h3 className={styles.rulesTitle}>Rules</h3>
+          <ol className={styles.rulesList}>
+            {rules.map((rule, i) => (
+              <li key={i} className={styles.ruleItem}>
+                {rule.title}
+                {rule.description && <span className={styles.ruleDescription}>{rule.description}</span>}
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </aside>
+  );
+}

@@ -379,6 +379,19 @@ public class CommunityService {
         return byId;
     }
 
+    // Read by CommunityController.about only (F4's plan) — a no-op for an anonymous viewer. Deliberately
+    // not wired into browse/search (GET /r, /r/search): per-result viewer context there is F5's (community
+    // discovery) job, not this one's, though it can reuse this exact method when that phase comes.
+    public void attachViewerContext(Community c, UUID viewerId) {
+        if (viewerId == null) {
+            return;
+        }
+        c.setIsMember(memberships.existsByUserIdAndCommunityId(viewerId, c.getId()));
+        c.setIsModerator(moderators.existsByCommunityIdAndUserId(c.getId(), viewerId));
+        joinRequests.findById(new CommunityJoinRequestId(c.getId(), viewerId))
+                .ifPresent(jr -> c.setJoinRequestStatus(jr.getStatus()));
+    }
+
     @Transactional
     public void setOwnFlair(UUID userId, UUID communityId, UUID flairId) {
         Membership m = memberships.findById(new MembershipId(userId, communityId))

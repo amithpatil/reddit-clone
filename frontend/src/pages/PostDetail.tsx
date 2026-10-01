@@ -1,4 +1,4 @@
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { CommentSortDropdown } from '../components/CommentSortDropdown';
 import { CommentThread } from '../components/CommentThread';
 import { PostMedia } from '../components/PostMedia';
@@ -34,7 +34,10 @@ export function PostDetail() {
         <div className={styles.body}>
           <div className={styles.meta}>
             Posted by u/{post.authorUsername ?? '[deleted]'} in{' '}
-            <span className={styles.communityLink}>r/{post.communityName ?? 'unknown'}</span> · {timeAgo(post.createdAt)}
+            <Link className={styles.communityLink} to={`/r/${post.communityName}`}>
+              r/{post.communityName ?? 'unknown'}
+            </Link>{' '}
+            · {timeAgo(post.createdAt)}
           </div>
           <h1 className={styles.title}>
             {post.title}

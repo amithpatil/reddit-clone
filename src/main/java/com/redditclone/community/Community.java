@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import org.hibernate.annotations.ColumnTransformer;
 
 import java.time.Instant;
@@ -40,6 +41,21 @@ public class Community {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    // Populated by CommunityService.attachViewerContext() for GET /{name}/about only — left null (not
+    // false) everywhere else, e.g. GET /r browse and /r/search, the same "null means not computed, not a
+    // real false" convention as Post.media/Post.flair. Boolean wrapper, not primitive, specifically so
+    // that absence serializes as JSON null rather than a misleading false.
+    @Transient
+    private Boolean isMember;
+
+    @Transient
+    private Boolean isModerator;
+
+    // "pending" | "approved" | "denied" | null — null for an anonymous viewer, a non-private community, or
+    // simply no join request ever made. Only ever populated alongside isMember/isModerator above.
+    @Transient
+    private String joinRequestStatus;
 
     public UUID getId() {
         return id;
@@ -108,5 +124,29 @@ public class Community {
 
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public Boolean getIsMember() {
+        return isMember;
+    }
+
+    public void setIsMember(Boolean isMember) {
+        this.isMember = isMember;
+    }
+
+    public Boolean getIsModerator() {
+        return isModerator;
+    }
+
+    public void setIsModerator(Boolean isModerator) {
+        this.isModerator = isModerator;
+    }
+
+    public String getJoinRequestStatus() {
+        return joinRequestStatus;
+    }
+
+    public void setJoinRequestStatus(String joinRequestStatus) {
+        this.joinRequestStatus = joinRequestStatus;
     }
 }

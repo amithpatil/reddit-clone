@@ -19,9 +19,13 @@ export function PostCard({ post, onVote }: PostCardProps) {
       <div className={styles.body}>
         <div className={styles.meta}>
           Posted by u/{post.authorUsername ?? '[deleted]'} in{' '}
-          <span className={styles.communityLink}>r/{post.communityName ?? 'unknown'}</span> · {timeAgo(post.createdAt)}
+          <Link className={styles.communityLink} to={`/r/${post.communityName}`}>
+            r/{post.communityName ?? 'unknown'}
+          </Link>{' '}
+          · {timeAgo(post.createdAt)}
         </div>
         <h2 className={styles.title}>
+          {post.pinned && <span className={`${styles.badge} ${styles.badgePinned}`}>📌 Pinned</span>}
           <Link className={styles.titleLink} to={detailHref}>
             {post.title}
           </Link>

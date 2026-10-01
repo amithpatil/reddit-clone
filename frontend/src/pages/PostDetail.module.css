@@ -22,6 +22,11 @@
 .communityLink {
   font-weight: 700;
   color: var(--color-text);
+  text-decoration: none;
+}
+
+.communityLink:hover {
+  text-decoration: underline;
 }
 
 .title {

@@ -1,0 +1,88 @@
+.sidebar {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  height: fit-content;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.modBadge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-sm);
+  padding: 2px 5px;
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
+.description {
+  font-size: 13px;
+  color: var(--color-text);
+  margin: 0 0 var(--space-3);
+  white-space: pre-wrap;
+}
+
+.stats {
+  display: flex;
+  gap: var(--space-4);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-3);
+}
+
+.statValue {
+  display: block;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.actionError {
+  font-size: 12px;
+  color: var(--color-danger);
+  margin: var(--space-2) 0 0;
+}
+
+.rulesTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: var(--space-4) 0 var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.rulesList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.ruleItem {
+  margin-bottom: var(--space-2);
+}
+
+.ruleDescription {
+  display: block;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}

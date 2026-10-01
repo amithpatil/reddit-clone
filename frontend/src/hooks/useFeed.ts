@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { ApiError } from '../lib/apiClient';
 import { castVote, fetchFeedPage, fetchMyPostVotes, removeVote } from '../lib/feedApi';
 import type { Post, SortType, TopPeriod } from '../types/post';
 
@@ -8,6 +9,11 @@ interface UseFeedResult {
   loading: boolean;
   loadingMore: boolean;
   error: string | null;
+  // True when the feed 403'd (a private community the viewer can't view) — distinct from `error`, a
+  // community page uses this to show an access message instead of a generic failure. `communityName` has
+  // been a generic parameter since F2 (home passes "all", which never 403s); F4 is its first caller with a
+  // real community name, where this distinction actually matters.
+  forbidden: boolean;
   hasMore: boolean;
   loadMore: () => void;
   applyVote: (postId: string, dir: 1 | -1) => void;
@@ -20,6 +26,7 @@ export function useFeed(communityName: string, sort: SortType, period: TopPeriod
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [forbidden, setForbidden] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const requestId = useRef(0);
 
@@ -44,6 +51,7 @@ export function useFeed(communityName: string, sort: SortType, period: TopPeriod
     const id = ++requestId.current;
     setLoading(true);
     setError(null);
+    setForbidden(false);
     setPosts([]);
     setAfter(null);
     setHasMore(true);
@@ -57,8 +65,13 @@ export function useFeed(communityName: string, sort: SortType, period: TopPeriod
         setPosts(merged);
         setAfter(listing.data.after);
         setHasMore(listing.data.after !== null);
-      } catch {
-        if (id === requestId.current) setError('Could not load the feed. Please try again.');
+      } catch (err) {
+        if (id !== requestId.current) return;
+        if (err instanceof ApiError && err.status === 403) {
+          setForbidden(true);
+        } else {
+          setError('Could not load the feed. Please try again.');
+        }
       } finally {
         if (id === requestId.current) setLoading(false);
       }
@@ -117,5 +130,5 @@ export function useFeed(communityName: string, sort: SortType, period: TopPeriod
     [],
   );
 
-  return { posts, loading, loadingMore, error, hasMore, loadMore, applyVote };
+  return { posts, loading, loadingMore, error, forbidden, hasMore, loadMore, applyVote };
 }

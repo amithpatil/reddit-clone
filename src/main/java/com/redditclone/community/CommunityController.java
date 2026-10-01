@@ -103,7 +103,9 @@ public class CommunityController {
     }
 
     @GetMapping("/{name}/about")
-    public Community about(@PathVariable String name) {
-        return communities.findByName(name);
+    public Community about(@AuthenticationPrincipal UUID viewerId, @PathVariable String name) {
+        Community c = communities.findByName(name);
+        communities.attachViewerContext(c, viewerId);
+        return c;
     }
 }

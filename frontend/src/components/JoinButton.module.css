@@ -1,0 +1,30 @@
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--color-link);
+  text-decoration: none;
+}
+
+.join {
+  background: var(--color-link);
+  color: var(--color-text-on-primary);
+}
+
+.joined {
+  background: var(--color-surface);
+  color: var(--color-link);
+}
+
+.pending {
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-color: var(--color-border);
+  cursor: default;
+}

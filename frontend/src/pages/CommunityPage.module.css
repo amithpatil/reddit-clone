@@ -1,0 +1,38 @@
+.layout {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+}
+
+.sidebarColumn {
+  width: 300px;
+  flex-shrink: 0;
+}
+
+.pinnedSection {
+  margin-bottom: var(--space-4);
+}
+
+.state {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 768px) {
+  .layout {
+    flex-direction: column;
+  }
+
+  .sidebarColumn {
+    width: 100%;
+  }
+}

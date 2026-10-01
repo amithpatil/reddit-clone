@@ -22,6 +22,11 @@
 .communityLink {
   font-weight: 700;
   color: var(--color-text);
+  text-decoration: none;
+}
+
+.communityLink:hover {
+  text-decoration: underline;
 }
 
 .title {
@@ -51,6 +56,13 @@
 .badgeSpoiler {
   color: var(--color-text-secondary);
   border: 1px solid var(--color-text-secondary);
+}
+
+.badgePinned {
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  margin-left: 0;
+  margin-right: var(--space-2);
 }
 
 .flairChip {
