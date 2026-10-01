@@ -52,6 +52,22 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     @Query("UPDATE Post p SET p.commentCount = p.commentCount + 1 WHERE p.id = :id")
     void incrementCommentCount(@Param("id") UUID id);
 
+    // A user's own "submitted" tab (F7) — identical shape to findNewAllPage (same removed/HiddenItem
+    // filters, same (createdAt, id) keyset order), scoped by author instead of sitewide.
+    @Query("""
+            SELECT p FROM Post p
+            WHERE p.authorId = :authorId AND p.removed = false
+              AND (p.createdAt < :cursorCreatedAt OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
+            ORDER BY p.createdAt DESC, p.id DESC
+            """)
+    List<Post> findByAuthorId(@Param("authorId") UUID authorId,
+                               @Param("cursorCreatedAt") Instant cursorCreatedAt,
+                               @Param("cursorId") UUID cursorId,
+                               @Param("viewerId") UUID viewerId,
+                               Pageable limit);
+
     @Query("""
             SELECT p FROM Post p
             WHERE p.communityId = :communityId AND p.removed = false

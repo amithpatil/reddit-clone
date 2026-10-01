@@ -42,8 +42,10 @@ export function NavBar() {
         {user ? (
           <div className={styles.userMenu}>
             <CreateMenu />
-            <span className={styles.avatar}>{user.username.slice(0, 1)}</span>
-            <span className={styles.username}>{user.username}</span>
+            <Link to={`/user/${user.username}`} className={styles.profileLink}>
+              <span className={styles.avatar}>{user.username.slice(0, 1)}</span>
+              <span className={styles.username}>{user.username}</span>
+            </Link>
             <button type="button" className={styles.logoutButton} onClick={handleLogout}>
               Log Out
             </button>

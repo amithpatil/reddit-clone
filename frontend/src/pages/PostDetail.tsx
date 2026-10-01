@@ -33,7 +33,15 @@ export function PostDetail() {
         <VoteControl score={post.score} myVote={post.myVote} onVote={applyPostVote} />
         <div className={styles.body}>
           <div className={styles.meta}>
-            Posted by u/{post.authorUsername ?? '[deleted]'} in{' '}
+            Posted by{' '}
+            {post.authorUsername ? (
+              <Link className={styles.communityLink} to={`/user/${post.authorUsername}`}>
+                u/{post.authorUsername}
+              </Link>
+            ) : (
+              'u/[deleted]'
+            )}{' '}
+            in{' '}
             <Link className={styles.communityLink} to={`/r/${post.communityName}`}>
               r/{post.communityName ?? 'unknown'}
             </Link>{' '}

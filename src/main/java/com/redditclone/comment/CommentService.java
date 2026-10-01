@@ -2,6 +2,7 @@ package com.redditclone.comment;
 
 import com.redditclone.auth.AuthService;
 import com.redditclone.comment.dto.CommentView;
+import com.redditclone.comment.dto.UserCommentView;
 import com.redditclone.common.KarmaEvent;
 import com.redditclone.common.OutboxWriter;
 import com.redditclone.common.RankFormulas;
@@ -21,6 +22,7 @@ import org.springframework.jdbc.core.namedparam.SqlParameterSource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -31,6 +33,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class CommentService {
@@ -250,6 +253,36 @@ public class CommentService {
 
     public Comment findById(UUID commentId) {
         return comments.findById(commentId).orElseThrow(() -> new NotFoundException("comment not found"));
+    }
+
+    // A user's "comments" profile tab (F7). Attaches postTitle/communityName in two batched queries (one
+    // per page, never one per comment): postService.findAllByIds for the page's distinct post ids, then
+    // communityService.findNamesByIds for those posts' distinct community ids — the same two-hop batching
+    // pattern post.PostService.attachAll already uses for Post.communityName.
+    public List<UserCommentView> findByAuthor(String username, Instant cursorCreatedAt, UUID cursorId,
+                                               UUID viewerId, int limit) {
+        UUID authorId = authService.findUserIdByUsername(username)
+                .orElseThrow(() -> new NotFoundException("no such user"));
+        List<Comment> page = comments.findByAuthorId(authorId, cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit));
+        if (page.isEmpty()) {
+            return List.of();
+        }
+
+        Set<UUID> postIds = page.stream().map(Comment::getPostId).collect(Collectors.toSet());
+        Map<UUID, Post> postsById = postService.findAllByIds(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+
+        Set<UUID> communityIds = postsById.values().stream().map(Post::getCommunityId)
+                .collect(Collectors.toSet());
+        Map<UUID, String> communityNames = communityService.findNamesByIds(communityIds);
+
+        return page.stream().map(c -> {
+            Post post = postsById.get(c.getPostId());
+            String postTitle = post != null ? post.getTitle() : null;
+            String communityName = post != null ? communityNames.get(post.getCommunityId()) : null;
+            return new UserCommentView(c.getId(), c.getPostId(), postTitle, communityName, c.getParentId(),
+                    c.getBody(), c.getScore(), c.getCreatedAt());
+        }).toList();
     }
 
     // For ModerationService's human-initiated removal path — Comment already has a public `removed`

@@ -154,6 +154,16 @@ public class PostService {
         return attachAll(posts.findNewAllPage(cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
+    // F7's "submitted" tab on a user's profile page. Resolves the username the same way
+    // comment.CommentService resolves u/-mentions (authService.findUserIdByUsername) rather than post
+    // reaching into auth.UserRepository directly, which ModuleBoundaryTest forbids.
+    public List<Post> findSubmittedByUsername(String username, Instant cursorCreatedAt, UUID cursorId,
+                                               UUID viewerId, int limit) {
+        UUID authorId = authService.findUserIdByUsername(username)
+                .orElseThrow(() -> new NotFoundException("no such user"));
+        return attachAll(posts.findByAuthorId(authorId, cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit)));
+    }
+
     // Deliberately does NOT attach media — used internally by other services (ban checks, comment-reply's
     // post lookup, moderation target checks) that don't display the post and shouldn't pay for an extra
     // query they don't need. findByIdWithMedia below is for the display path.
@@ -163,6 +173,13 @@ public class PostService {
 
     public Post findByIdWithMedia(UUID postId) {
         return attachAll(findById(postId));
+    }
+
+    // Batched, no media/flair/display-field attach — same "internal lookup, not a display path" reasoning
+    // as findById above. Used by comment.CommentService.findByAuthor (F7) to resolve a page of the user's
+    // comments' post titles/communityIds in one query instead of one per comment.
+    public List<Post> findAllByIds(Set<UUID> ids) {
+        return posts.findAllById(ids);
     }
 
     // For ModerationService's human-initiated removal path — Post already has a public `removed` setter

@@ -9,6 +9,7 @@ import { Login } from './pages/Login';
 import { PostDetail } from './pages/PostDetail';
 import { PostSubmit } from './pages/PostSubmit';
 import { Register } from './pages/Register';
+import { UserProfile } from './pages/UserProfile';
 
 function App() {
   const { initializing } = useAuth();
@@ -31,6 +32,7 @@ function App() {
         <Route path="/communities" element={<CommunityDiscovery />} />
         <Route path="/communities/create" element={<CreateCommunity />} />
         <Route path="/submit" element={<PostSubmit />} />
+        <Route path="/user/:username" element={<UserProfile />} />
       </Route>
     </Routes>
   );

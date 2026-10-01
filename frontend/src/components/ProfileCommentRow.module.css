@@ -1,0 +1,48 @@
+.row {
+  display: flex;
+  gap: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.body {
+  flex: 1;
+  min-width: 0;
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-1);
+}
+
+.postLink {
+  font-weight: 600;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.postLink:hover {
+  text-decoration: underline;
+}
+
+.communityLink {
+  font-weight: 700;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.communityLink:hover {
+  text-decoration: underline;
+}
+
+.text {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+}

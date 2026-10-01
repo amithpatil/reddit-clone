@@ -2,7 +2,12 @@ package com.redditclone.comment;
 
 import com.redditclone.comment.dto.PostWithCommentsView;
 import com.redditclone.comment.dto.ReplyRequest;
+import com.redditclone.comment.dto.UserCommentView;
 import com.redditclone.common.exception.NotFoundException;
+import com.redditclone.common.paging.Cursor;
+import com.redditclone.common.paging.CursorCodec;
+import com.redditclone.common.paging.Listing;
+import com.redditclone.common.paging.Thing;
 import com.redditclone.community.CommunityService;
 import com.redditclone.post.PostService;
 import jakarta.validation.Valid;
@@ -15,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -53,5 +59,24 @@ public class CommentController {
         }
         var comments = commentService.findCommentTree(postId, viewerId, sort);
         return new PostWithCommentsView(post, comments);
+    }
+
+    private static final String COMMENT_KIND = "t1";
+    private static final int PROFILE_PAGE_SIZE = 25;
+
+    // A user's "comments" profile tab (F7). No class-level @RequestMapping on this controller, so a
+    // /user/{username}/... route sits alongside /api/comment and /r/{communityName}/comments/{postId}
+    // without conflict.
+    @GetMapping("/user/{username}/comments")
+    public Listing<UserCommentView> userComments(@AuthenticationPrincipal UUID viewerId, @PathVariable String username,
+                                                  @RequestParam(required = false) String after) {
+        Cursor cursor = CursorCodec.decode(after);
+        List<UserCommentView> page = commentService.findByAuthor(username, cursor.createdAt(), cursor.id(),
+                viewerId, PROFILE_PAGE_SIZE);
+
+        List<Thing<UserCommentView>> children = page.stream().map(c -> new Thing<>(COMMENT_KIND, c)).toList();
+        String next = page.isEmpty() ? null
+                : CursorCodec.encode(page.getLast().createdAt(), page.getLast().id());
+        return Listing.of(children, next);
     }
 }

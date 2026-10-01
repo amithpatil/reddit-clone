@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { timeAgo } from '../lib/time';
 import type { CommentNode } from '../types/comment';
 import { ReplyBox } from './ReplyBox';
@@ -30,7 +31,13 @@ export function CommentThread({ comment, onVote, onReply }: CommentThreadProps) 
         </div>
         <div className={styles.body}>
           <div className={styles.meta}>
-            <span className={styles.author}>u/{comment.authorUsername ?? '[deleted]'}</span>{' '}
+            {comment.authorUsername ? (
+              <Link className={styles.author} to={`/user/${comment.authorUsername}`}>
+                u/{comment.authorUsername}
+              </Link>
+            ) : (
+              <span className={styles.author}>u/[deleted]</span>
+            )}{' '}
             <span className={styles.time}>· {timeAgo(comment.createdAt)}</span>
           </div>
           <p className={comment.removed ? `${styles.text} ${styles.textRemoved}` : styles.text}>{comment.body}</p>

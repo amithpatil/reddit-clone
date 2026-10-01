@@ -75,6 +75,13 @@
   gap: var(--space-2);
 }
 
+.profileLink {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+}
+
 .avatar {
   width: 28px;
   height: 28px;

@@ -21,6 +21,11 @@
 .author {
   font-weight: 700;
   color: var(--color-text);
+  text-decoration: none;
+}
+
+.author:hover {
+  text-decoration: underline;
 }
 
 .time {

@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -91,6 +92,24 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
 
     @Query("SELECT c.id AS id, c.authorId AS authorId FROM Comment c WHERE c.id IN :ids")
     List<CommentAuthorProjection> findAuthorIdsByIds(@Param("ids") Set<UUID> ids);
+
+    // A user's "comments" profile tab (F7) — every comment they've made, top-level or reply (unlike the
+    // per-post root queries above, there's no parentId IS NULL restriction: Reddit's own Comments tab
+    // shows replies too). Same HiddenItem viewer filter and unremoved-only convention as every other
+    // listing query in this codebase.
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.authorId = :authorId AND c.removed = false
+              AND (c.createdAt < :cursorCreatedAt OR (c.createdAt = :cursorCreatedAt AND c.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.createdAt DESC, c.id DESC
+            """)
+    List<Comment> findByAuthorId(@Param("authorId") UUID authorId,
+                                  @Param("cursorCreatedAt") Instant cursorCreatedAt,
+                                  @Param("cursorId") UUID cursorId,
+                                  @Param("viewerId") UUID viewerId,
+                                  Pageable limit);
 
     interface CommentAuthorProjection {
         UUID getId();

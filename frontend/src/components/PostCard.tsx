@@ -18,7 +18,15 @@ export function PostCard({ post, onVote }: PostCardProps) {
       <VoteControl score={post.score} myVote={post.myVote} onVote={(dir) => onVote(post.id, dir)} />
       <div className={styles.body}>
         <div className={styles.meta}>
-          Posted by u/{post.authorUsername ?? '[deleted]'} in{' '}
+          Posted by{' '}
+          {post.authorUsername ? (
+            <Link className={styles.authorLink} to={`/user/${post.authorUsername}`}>
+              u/{post.authorUsername}
+            </Link>
+          ) : (
+            'u/[deleted]'
+          )}{' '}
+          in{' '}
           <Link className={styles.communityLink} to={`/r/${post.communityName}`}>
             r/{post.communityName ?? 'unknown'}
           </Link>{' '}
