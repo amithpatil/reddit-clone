@@ -18,6 +18,12 @@ export function fetchPublicProfile(username: string): Promise<PublicProfile> {
   return api.get(`/user/${username}/about`) as Promise<PublicProfile>;
 }
 
+// Not paginated — GET /user/search returns a single capped page server-side, same "relevance ranking
+// isn't a stable keyset sort key" reasoning as searchCommunities/the backend's own search queries.
+export function searchUsers(query: string): Promise<PublicProfile[]> {
+  return api.get(`/user/search?q=${encodeURIComponent(query)}`) as Promise<PublicProfile[]>;
+}
+
 export function fetchUserPosts(username: string, after?: string | null): Promise<Listing<Post>> {
   const query = after ? `?after=${encodeURIComponent(after)}` : '';
   return api.get(`/user/${username}/submitted${query}`) as Promise<Listing<Post>>;

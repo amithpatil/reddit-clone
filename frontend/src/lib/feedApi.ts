@@ -25,6 +25,14 @@ export async function fetchMyPostVotes(postIds: string[]): Promise<Record<string
   return (await api.get(`/api/vote/mine?${params.toString()}`)) as Record<string, 1 | -1>;
 }
 
+// Not paginated — GET /r/all/search returns a single capped page server-side, same "relevance ranking
+// isn't a stable keyset sort key" reasoning as the per-community search this reuses the "all" pseudo-
+// community convention from (see fetchFeedPage's own comment).
+export async function searchAllPosts(query: string): Promise<Post[]> {
+  const listing = (await api.get(`/r/all/search?q=${encodeURIComponent(query)}`)) as Listing<Post>;
+  return listing.data.children.map((c) => c.data);
+}
+
 export function castVote(targetType: 'post' | 'comment', targetId: string, dir: 1 | -1): Promise<unknown> {
   return api.post('/api/vote', { targetType, targetId, dir });
 }

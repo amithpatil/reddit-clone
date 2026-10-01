@@ -26,6 +26,19 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     // Batched counterpart to findByUsername, for resolving several u/{username} mentions in one query.
     List<User> findByUsernameIn(Set<String> usernames);
 
+    // Native query: the GIN trigram index (users_username_trgm_idx) accelerates ILIKE's substring match;
+    // similarity() orders best-match-first, karma_post breaks ties — same shape as
+    // CommunityRepository.searchByName. status = 'active' excludes deleted/banned accounts from search
+    // results, matching the "active".equals(status) check used throughout this class. No pagination, same
+    // "a relevance ranking isn't a stable keyset sort key" reasoning as the post/community search queries.
+    @Query(value = """
+            SELECT * FROM users
+            WHERE status = 'active' AND username ILIKE '%' || :query || '%'
+            ORDER BY similarity(username, :query) DESC, karma_post DESC
+            LIMIT 25
+            """, nativeQuery = true)
+    List<User> searchByUsername(@Param("query") String query);
+
     // clearAutomatically: same reasoning as CommentRepository.incrementChildCount — without it, a User
     // entity already loaded in this transaction would keep its stale pre-update karma in the persistence
     // context, and a later save of that entity would silently clobber this bulk update.

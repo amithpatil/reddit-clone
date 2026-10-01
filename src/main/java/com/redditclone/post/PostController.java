@@ -157,9 +157,14 @@ public class PostController {
     @GetMapping("/search")
     public Listing<Post> search(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                  @RequestParam("q") String query) {
-        UUID communityId = communityService.findByName(communityName).getId();
-        communityService.requireViewAccess(viewerId, communityId);
-        List<Post> results = postService.search(communityId, query);
+        List<Post> results;
+        if (isAllFeed(communityName)) {
+            results = postService.searchAll(query, viewerId);
+        } else {
+            UUID communityId = communityService.findByName(communityName).getId();
+            communityService.requireViewAccess(viewerId, communityId);
+            results = postService.search(communityId, query);
+        }
         List<Thing<Post>> children = results.stream().map(p -> new Thing<>(POST_KIND, p)).toList();
         return Listing.of(children, null);
     }

@@ -191,6 +191,28 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
             """, nativeQuery = true)
     List<UUID> searchIds(@Param("communityId") UUID communityId, @Param("query") String query);
 
+    // Sitewide "r/all" counterpart of searchIds above — same ranked-ids-only shape, minus the community_id
+    // filter, plus an explicit private-community exclusion (mirrors CommunityService.requireViewAccess's
+    // own "non-private, or a member, or any moderator" rule, done in bulk here since there's no single
+    // community to call that per-community check against). Joining communities/memberships/
+    // community_moderators by table name in this native query is not a cross-module repository reference
+    // (no Java import of MembershipRepository/CommunityModeratorRepository), so this stays inside the post
+    // module with no new ModuleBoundaryTest risk — same precedent as the HiddenItem JPQL subquery above.
+    // A NULL :viewerId (anonymous) never satisfies either EXISTS, so anonymous viewers correctly see only
+    // non-private matches with no extra IS NULL special-casing needed.
+    @Query(value = """
+            SELECT p.id FROM posts p
+            JOIN communities c ON c.id = p.community_id
+            WHERE NOT p.removed
+              AND p.search_vector @@ websearch_to_tsquery('english', :query)
+              AND (c.type <> 'private'
+                   OR EXISTS (SELECT 1 FROM memberships m WHERE m.user_id = :viewerId AND m.community_id = p.community_id)
+                   OR EXISTS (SELECT 1 FROM community_moderators cm WHERE cm.user_id = :viewerId AND cm.community_id = p.community_id))
+            ORDER BY ts_rank(p.search_vector, websearch_to_tsquery('english', :query)) DESC
+            LIMIT 25
+            """, nativeQuery = true)
+    List<UUID> searchAllIds(@Param("query") String query, @Param("viewerId") UUID viewerId);
+
     int countByCommunityIdAndPinnedTrue(UUID communityId);
 
     List<Post> findByCommunityIdAndPinnedTrueAndRemovedFalseOrderByCreatedAtDesc(UUID communityId);

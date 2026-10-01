@@ -233,6 +233,18 @@ public class PostService {
         return attachAll(rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList());
     }
 
+    // Sitewide "r/all" counterpart of search above — same rank-then-refetch shape, backed by a query that
+    // excludes private communities the viewer can't see instead of a single community_id filter.
+    public List<Post> searchAll(String query, UUID viewerId) {
+        List<UUID> rankedIds = posts.searchAllIds(query, viewerId);
+        if (rankedIds.isEmpty()) {
+            return List.of();
+        }
+        Map<UUID, Post> byId = new HashMap<>();
+        posts.findAllById(rankedIds).forEach(p -> byId.put(p.getId(), p));
+        return attachAll(rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList());
+    }
+
     public void incrementCommentCount(UUID postId) {
         posts.incrementCommentCount(postId);
     }

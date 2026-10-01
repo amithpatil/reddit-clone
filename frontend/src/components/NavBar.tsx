@@ -18,11 +18,9 @@ export function NavBar() {
     navigate('/');
   };
 
-  // The only search capability that exists today is community search (GET /r/search) — sitewide post/user
-  // search is backend feature 7, still parked. This has been a disabled placeholder since F1.
   const handleSearch = (e: FormEvent) => {
     e.preventDefault();
-    navigate(query.trim() ? `/communities?q=${encodeURIComponent(query.trim())}` : '/communities');
+    navigate(query.trim() ? `/search?q=${encodeURIComponent(query.trim())}` : '/communities');
   };
 
   return (
