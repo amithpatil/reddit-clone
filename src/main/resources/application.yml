@@ -52,6 +52,13 @@ app:
     max-pinned-posts: ${MAX_PINNED_POSTS:2}   # old Reddit's historical sticky-post cap
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5174}   # Vite dev server (fixed port, see frontend/vite.config.ts)
+  rate-limit:
+    login:
+      capacity: ${RATE_LIMIT_LOGIN_CAPACITY:5}
+      period-minutes: ${RATE_LIMIT_LOGIN_PERIOD_MINUTES:1}
+    register:
+      capacity: ${RATE_LIMIT_REGISTER_CAPACITY:3}
+      period-minutes: ${RATE_LIMIT_REGISTER_PERIOD_MINUTES:60}
 
 management:
   endpoints:

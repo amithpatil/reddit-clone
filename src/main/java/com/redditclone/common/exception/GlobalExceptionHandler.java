@@ -38,6 +38,11 @@ public class GlobalExceptionHandler {
         return body(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
 
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<Object> handleTooManyRequests(TooManyRequestsException ex) {
+        return body(HttpStatus.TOO_MANY_REQUESTS, ex.getMessage());
+    }
+
     // Safety net behind the service-layer existence pre-checks (email/username in AuthService,
     // community name in CommunityService): two concurrent requests can both pass a pre-check before
     // either commits, so the DB's UNIQUE constraint is still the actual source of truth. Without this,
