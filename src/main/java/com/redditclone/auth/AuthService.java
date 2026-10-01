@@ -226,6 +226,16 @@ public class AuthService {
                 .orElse(true);
     }
 
+    // Sparse, default-off (opposite polarity from wantsNotification, same sparse shape): absent key or no
+    // settings row means "unrestricted," matching today's status quo — only an explicit true opts a user
+    // into requiring an existing relationship before a stranger can start a new chat with them. Read by
+    // chat.ChatService before creating a brand-new room; never affects a room that already exists.
+    public boolean restrictsChatToKnown(UUID userId) {
+        return userSettings.findById(userId)
+                .map(s -> Boolean.TRUE.equals(s.getPrivacyPrefs().get("restrictChatToKnown")))
+                .orElse(false);
+    }
+
     // Near-identical shape to banAccount: verify the password first (401, no state change, on mismatch —
     // matches the checkpoint exactly), then anonymize rather than hard-delete or cascade, matching this
     // codebase's established soft-delete philosophy for content (posts/comments keep their now-anonymized

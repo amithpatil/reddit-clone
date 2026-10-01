@@ -78,6 +78,16 @@ public class ChatService {
                     .orElseThrow(() -> new NotFoundException("no such chat room"));
         }
 
+        // Only checked on the brand-new-room path above — reopening an existing room (the branch just
+        // above) is never affected, so a conversation that already exists keeps working even if one side
+        // later opts into this restriction.
+        for (UUID targetId : resolved.values()) {
+            if (!targetId.equals(callerId) && authService.restrictsChatToKnown(targetId)
+                    && !alreadyKnowsEachOther(callerId, targetId)) {
+                throw new ForbiddenException("this user only accepts messages from people they've already talked to");
+            }
+        }
+
         ChatRoom room = new ChatRoom();
         room.setId(ids.nextId());
         chatRooms.save(room);
@@ -235,5 +245,19 @@ public class ChatService {
                 HAVING COUNT(*) = :size AND COUNT(*) FILTER (WHERE user_id IN (:ids)) = :size
                 """, new MapSqlParameterSource().addValue("size", participantIds.size()).addValue("ids", participantIds));
         return rows.isEmpty() ? Optional.empty() : Optional.of((UUID) rows.get(0).get("room_id"));
+    }
+
+    // "Already talked to" for the restrictChatToKnown privacy gate — any room the two already share, not
+    // necessarily one with this exact participant set (unlike findExactRoom, which is about dedup for the
+    // room being created right now).
+    private boolean alreadyKnowsEachOther(UUID a, UUID b) {
+        Boolean exists = jdbc.queryForObject("""
+                SELECT EXISTS (
+                    SELECT 1 FROM chat_room_participants p1
+                    JOIN chat_room_participants p2 ON p1.room_id = p2.room_id
+                    WHERE p1.user_id = :a AND p2.user_id = :b
+                )
+                """, new MapSqlParameterSource().addValue("a", a).addValue("b", b), Boolean.class);
+        return Boolean.TRUE.equals(exists);
     }
 }

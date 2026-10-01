@@ -53,27 +53,6 @@
   margin: 0 0 var(--space-2);
 }
 
-.prefsError {
-  font-size: 12px;
-  color: var(--color-danger);
-  margin-bottom: var(--space-2);
-}
-
-.prefsList {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-
-.prefItem {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--color-text);
-  cursor: pointer;
-}
-
 .state {
   background: var(--color-surface);
   border: 1px solid var(--color-border);

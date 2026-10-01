@@ -5,6 +5,7 @@ import { ChatNavLink } from './ChatNavLink';
 import { CreateMenu } from './CreateMenu';
 import { Logo } from './Logo';
 import { NotificationBell } from './NotificationBell';
+import { SettingsNavLink } from './SettingsNavLink';
 import styles from './NavBar.module.css';
 
 export function NavBar() {
@@ -46,6 +47,7 @@ export function NavBar() {
             <CreateMenu />
             <ChatNavLink />
             <NotificationBell />
+            <SettingsNavLink />
             <Link to={`/user/${user.username}`} className={styles.profileLink}>
               <span className={styles.avatar}>{user.username.slice(0, 1)}</span>
               <span className={styles.username}>{user.username}</span>

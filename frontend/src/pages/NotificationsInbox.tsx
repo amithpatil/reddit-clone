@@ -1,17 +1,9 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { fetchSettings, updateNotificationPrefs } from '../lib/settingsApi';
+import { NotificationPrefsForm } from '../components/NotificationPrefsForm';
 import { timeAgo } from '../lib/time';
 import { useNotifications } from '../notifications/NotificationsContext';
-import type { NotificationItem, NotificationType } from '../types/notification';
+import type { NotificationItem } from '../types/notification';
 import styles from './NotificationsInbox.module.css';
-
-const MUTE_TYPES: { type: NotificationType; label: string }[] = [
-  { type: 'post_reply', label: 'Post replies' },
-  { type: 'reply', label: 'Comment replies' },
-  { type: 'mention', label: 'Mentions' },
-  { type: 'chat_message', label: 'Chat messages' },
-];
 
 // chat_message never links anywhere — chat has no frontend page yet (that's F10) — and reply/mention
 // also only link to the post itself, not a specific comment: PostDetail has no comment-anchor/scroll-to
@@ -35,23 +27,6 @@ function describe(n: NotificationItem): { text: string; href: string | null } {
 
 export function NotificationsInbox() {
   const { notifications, unreadCount, loading, markRead, markAllRead } = useNotifications();
-  const [prefs, setPrefs] = useState<Partial<Record<NotificationType, boolean>> | null>(null);
-  const [prefsError, setPrefsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetchSettings()
-      .then((s) => setPrefs(s.notificationPrefs))
-      .catch(() => setPrefsError('Could not load notification settings.'));
-  }, []);
-
-  const togglePref = async (type: NotificationType, enabled: boolean) => {
-    setPrefs((prev) => ({ ...(prev ?? {}), [type]: enabled }));
-    try {
-      await updateNotificationPrefs({ [type]: enabled });
-    } catch {
-      setPrefsError('Could not save that setting.');
-    }
-  };
 
   return (
     <div className={styles.page}>
@@ -64,20 +39,7 @@ export function NotificationsInbox() {
 
       <section className={styles.prefs}>
         <h2 className={styles.prefsTitle}>Notify me about</h2>
-        {prefsError && <div className={styles.prefsError}>{prefsError}</div>}
-        <div className={styles.prefsList}>
-          {MUTE_TYPES.map(({ type, label }) => (
-            <label key={type} className={styles.prefItem}>
-              <input
-                type="checkbox"
-                checked={prefs ? prefs[type] !== false : true}
-                disabled={prefs === null}
-                onChange={(e) => togglePref(type, e.target.checked)}
-              />
-              {label}
-            </label>
-          ))}
-        </div>
+        <NotificationPrefsForm />
       </section>
 
       {loading && notifications.length === 0 ? (

@@ -16,6 +16,7 @@
   --color-text-secondary: #787c7e;
   --color-text-on-primary: #ffffff;
   --color-danger: #ea0027;
+  --color-danger-bg: #fdecea;
 
   /* Type */
   --font-ui: 'IBM Plex Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
@@ -37,4 +38,46 @@
   /* Layout */
   --nav-height: 48px;
   --content-max-width: 1200px;
+
+  color-scheme: light;
+}
+
+/* Dark theme, F11 — Reddit's own real dark theme as the visual reference, consistent with F1's "modern
+   Reddit redesign" target. Two guards: system preference (no explicit choice made yet) and an explicit
+   [data-theme="dark"] choice, which wins regardless of the OS preference. No separate light override block
+   is needed — :root's defaults above already are the light palette. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --color-primary-hover: #ff5a1a;
+    --color-downvote: #9494ff;
+    --color-link: #4fbcff;
+
+    --color-bg: #030303;
+    --color-surface: #1a1a1b;
+    --color-border: #343536;
+
+    --color-text: #d7dadc;
+    --color-text-secondary: #818384;
+    --color-danger: #ff6b6b;
+    --color-danger-bg: #3a1f1f;
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme='dark'] {
+  --color-primary-hover: #ff5a1a;
+  --color-downvote: #9494ff;
+  --color-link: #4fbcff;
+
+  --color-bg: #030303;
+  --color-surface: #1a1a1b;
+  --color-border: #343536;
+
+  --color-text: #d7dadc;
+  --color-text-secondary: #818384;
+  --color-danger: #ff6b6b;
+  --color-danger-bg: #3a1f1f;
+
+  color-scheme: dark;
 }

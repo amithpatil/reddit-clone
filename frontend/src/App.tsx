@@ -13,6 +13,7 @@ import { NotificationsInbox } from './pages/NotificationsInbox';
 import { PostDetail } from './pages/PostDetail';
 import { PostSubmit } from './pages/PostSubmit';
 import { Register } from './pages/Register';
+import { Settings } from './pages/Settings';
 import { UserProfile } from './pages/UserProfile';
 
 function App() {
@@ -39,6 +40,7 @@ function App() {
         <Route path="/communities" element={<CommunityDiscovery />} />
         <Route path="/communities/create" element={<CreateCommunity />} />
         <Route path="/notifications" element={<NotificationsInbox />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/submit" element={<PostSubmit />} />
         <Route path="/user/:username" element={<UserProfile />} />
       </Route>

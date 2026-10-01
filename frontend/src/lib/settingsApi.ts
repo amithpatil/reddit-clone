@@ -18,3 +18,17 @@ export function fetchSettings(): Promise<UserSettings> {
 export function updateNotificationPrefs(prefs: Partial<Record<NotificationType, boolean>>): Promise<UserSettings> {
   return api.patch('/api/v1/me/prefs', { notificationPrefs: prefs }) as Promise<UserSettings>;
 }
+
+export function updateNsfwBlur(value: boolean): Promise<UserSettings> {
+  return api.patch('/api/v1/me/prefs', { nsfwBlur: value }) as Promise<UserSettings>;
+}
+
+// Same merge-not-replace semantics as notificationPrefs — sending just the changed key never clobbers
+// other privacyPrefs keys (e.g. toggling theme doesn't wipe restrictChatToKnown, and vice versa).
+export function updatePrivacyPrefs(prefs: Record<string, unknown>): Promise<UserSettings> {
+  return api.patch('/api/v1/me/prefs', { privacyPrefs: prefs }) as Promise<UserSettings>;
+}
+
+export function deleteAccount(password: string): Promise<unknown> {
+  return api.del('/api/v1/me', { password });
+}

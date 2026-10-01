@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { useSettings } from '../settings/SettingsContext';
 import type { Post } from '../types/post';
 import styles from './PostMedia.module.css';
 
@@ -16,7 +18,7 @@ function domainOf(url: string): string {
   }
 }
 
-export function PostMedia({ post, fullBody = false }: PostMediaProps) {
+function renderContent(post: Post, fullBody: boolean) {
   if (post.kind === 'image' || post.kind === 'video') {
     if (post.media?.processingStatus === 'ready' && post.media.thumbnailUrl) {
       return post.kind === 'video' ? (
@@ -35,4 +37,23 @@ export function PostMedia({ post, fullBody = false }: PostMediaProps) {
     return <p className={snippetClass}>{post.body}</p>;
   }
   return null;
+}
+
+export function PostMedia({ post, fullBody = false }: PostMediaProps) {
+  const { nsfwBlurEffective } = useSettings();
+  const [revealed, setRevealed] = useState(false);
+  const content = renderContent(post, fullBody);
+  if (content === null) return null;
+
+  if (post.nsfw && nsfwBlurEffective && !revealed) {
+    return (
+      <div className={styles.nsfwWrapper}>
+        <div className={styles.nsfwBlurred}>{content}</div>
+        <button type="button" className={styles.nsfwReveal} onClick={() => setRevealed(true)}>
+          NSFW — click to view
+        </button>
+      </div>
+    );
+  }
+  return content;
 }
