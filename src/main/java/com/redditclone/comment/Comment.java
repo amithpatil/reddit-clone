@@ -56,6 +56,9 @@ public class Comment {
     @Column(name = "best_rank", nullable = false)
     private double bestRank = 0;
 
+    @Column(name = "controversial_rank", nullable = false)
+    private double controversialRank = 0;
+
     @Column(name = "child_count", nullable = false)
     private int childCount = 0;
 
@@ -139,6 +142,10 @@ public class Comment {
 
     public double getBestRank() {
         return bestRank;
+    }
+
+    public double getControversialRank() {
+        return controversialRank;
     }
 
     public int getChildCount() {

@@ -24,7 +24,45 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.bestRank DESC, c.id DESC
             """)
-    List<Comment> findTopLevel(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit); // capped, never unbounded
+    List<Comment> findTopLevelByBest(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit); // capped, never unbounded
+
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.score DESC, c.id DESC
+            """)
+    List<Comment> findTopLevelByTop(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.createdAt DESC, c.id DESC
+            """)
+    List<Comment> findTopLevelByNew(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    // Ascending throughout (not mixed with a descending tiebreaker) so a future keyset cursor over this
+    // sort has a consistent direction to compare against — see the comment sort feature's plan.
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.createdAt ASC, c.id ASC
+            """)
+    List<Comment> findTopLevelByOld(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.postId = :postId AND c.parentId IS NULL AND c.removed = false
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.controversialRank DESC, c.id DESC
+            """)
+    List<Comment> findTopLevelByControversial(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
 
     // clearAutomatically: without it, a `parent` entity already loaded in this transaction (see
     // CommentService.reply) keeps its stale pre-increment childCount in the persistence context, and a

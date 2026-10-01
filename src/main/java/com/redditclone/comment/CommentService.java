@@ -166,8 +166,19 @@ public class CommentService {
         outbox.writeEvents("notification", payloads);
     }
 
-    public List<Comment> findTopLevel(UUID postId, UUID viewerId) {
-        return comments.findTopLevel(postId, viewerId, Pageable.ofSize(TOP_LEVEL_PAGE_SIZE));
+    // best is Reddit's own default (Wilson confidence, not raw score). Only sort diversity here — still
+    // capped at TOP_LEVEL_PAGE_SIZE with no cursor to fetch a second page; real pagination is feature 8's
+    // job (/api/morechildren), not this one's.
+    public List<Comment> findTopLevel(UUID postId, UUID viewerId, String sort) {
+        Pageable limit = Pageable.ofSize(TOP_LEVEL_PAGE_SIZE);
+        return switch (sort) {
+            case "best" -> comments.findTopLevelByBest(postId, viewerId, limit);
+            case "top" -> comments.findTopLevelByTop(postId, viewerId, limit);
+            case "new" -> comments.findTopLevelByNew(postId, viewerId, limit);
+            case "old" -> comments.findTopLevelByOld(postId, viewerId, limit);
+            case "controversial" -> comments.findTopLevelByControversial(postId, viewerId, limit);
+            default -> throw new BadRequestException("invalid comment sort");
+        };
     }
 
     public Comment findById(UUID commentId) {
@@ -219,15 +230,19 @@ public class CommentService {
             int ups = (Integer) row.get("ups");
             int downs = (Integer) row.get("downs");
             double bestRank = RankFormulas.bestRank(ups, downs);
-            rankParams.add(new MapSqlParameterSource().addValue("id", id).addValue("bestRank", bestRank));
+            double controversialRank = RankFormulas.controversialRank(ups, downs);
+            rankParams.add(new MapSqlParameterSource().addValue("id", id)
+                    .addValue("bestRank", bestRank).addValue("controversialRank", controversialRank));
 
             int scoreDelta = deltas.get(id).scoreDelta();
             if (scoreDelta != 0) {
                 karmaEvents.add(new KarmaEvent(authorId, scoreDelta, id));
             }
         }
-        jdbc.batchUpdate("UPDATE comments SET best_rank = :bestRank WHERE id = :id",
-                rankParams.toArray(new SqlParameterSource[0]));
+        jdbc.batchUpdate("""
+                UPDATE comments SET best_rank = :bestRank, controversial_rank = :controversialRank
+                WHERE id = :id
+                """, rankParams.toArray(new SqlParameterSource[0]));
         return karmaEvents;
     }
 

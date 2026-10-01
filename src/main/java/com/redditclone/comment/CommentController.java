@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -40,7 +41,8 @@ public class CommentController {
 
     @GetMapping("/r/{communityName}/comments/{postId}")
     public PostWithCommentsView getPostWithComments(@AuthenticationPrincipal UUID viewerId,
-                                                      @PathVariable String communityName, @PathVariable UUID postId) {
+                                                      @PathVariable String communityName, @PathVariable UUID postId,
+                                                      @RequestParam(required = false, defaultValue = "best") String sort) {
         UUID communityId = communityService.findByName(communityName).getId();
         communityService.requireViewAccess(viewerId, communityId);
         var post = postService.findByIdWithMedia(postId);
@@ -50,7 +52,7 @@ public class CommentController {
         if (post.isRemoved() || !post.getCommunityId().equals(communityId)) {
             throw new NotFoundException("post not found");
         }
-        var comments = commentService.findTopLevel(postId, viewerId).stream().map(CommentView::from).toList();
+        var comments = commentService.findTopLevel(postId, viewerId, sort).stream().map(CommentView::from).toList();
         return new PostWithCommentsView(post, comments);
     }
 }
