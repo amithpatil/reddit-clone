@@ -30,7 +30,7 @@ public class AccountController {
 
     @PatchMapping("/prefs")
     public UserSettings updatePrefs(@AuthenticationPrincipal UUID userId, @RequestBody UpdatePrefsRequest req) {
-        return authService.updateSettings(userId, req.nsfwBlur(), req.privacyPrefs());
+        return authService.updateSettings(userId, req.nsfwBlur(), req.privacyPrefs(), req.notificationPrefs());
     }
 
     @DeleteMapping

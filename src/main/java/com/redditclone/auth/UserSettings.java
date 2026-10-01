@@ -26,6 +26,13 @@ public class UserSettings {
     @Column(name = "privacy_prefs", columnDefinition = "jsonb", nullable = false)
     private Map<String, Object> privacyPrefs = new HashMap<>();
 
+    // Sparse, same contract as privacyPrefs: an absent key means "enabled" (default-on), only an explicit
+    // false disables a notification type. Read by notify.NotificationOutboxWorker via AuthService, never
+    // directly, to keep the cross-module read going through this module's own service.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "notification_prefs", columnDefinition = "jsonb", nullable = false)
+    private Map<String, Boolean> notificationPrefs = new HashMap<>();
+
     public UUID getUserId() {
         return userId;
     }
@@ -48,5 +55,13 @@ public class UserSettings {
 
     public void setPrivacyPrefs(Map<String, Object> privacyPrefs) {
         this.privacyPrefs = privacyPrefs;
+    }
+
+    public Map<String, Boolean> getNotificationPrefs() {
+        return notificationPrefs;
+    }
+
+    public void setNotificationPrefs(Map<String, Boolean> notificationPrefs) {
+        this.notificationPrefs = notificationPrefs;
     }
 }

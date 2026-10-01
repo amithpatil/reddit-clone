@@ -194,7 +194,8 @@ public class AuthService {
     }
 
     @Transactional
-    public UserSettings updateSettings(UUID userId, Boolean nsfwBlur, Map<String, Object> privacyPrefs) {
+    public UserSettings updateSettings(UUID userId, Boolean nsfwBlur, Map<String, Object> privacyPrefs,
+                                        Map<String, Boolean> notificationPrefs) {
         UserSettings settings = getSettings(userId);
         if (nsfwBlur != null) {
             settings.setNsfwBlur(nsfwBlur);
@@ -207,7 +208,22 @@ public class AuthService {
             merged.putAll(privacyPrefs);
             settings.setPrivacyPrefs(merged);
         }
+        if (notificationPrefs != null) {
+            // Same merge-not-replace reasoning as privacyPrefs above.
+            Map<String, Boolean> merged = new HashMap<>(settings.getNotificationPrefs());
+            merged.putAll(notificationPrefs);
+            settings.setNotificationPrefs(merged);
+        }
         return userSettings.save(settings);
+    }
+
+    // Sparse, default-on: absent key or no settings row at all means "enabled," only an explicit false
+    // disables a type. Read by notify.NotificationOutboxWorker before inserting a notifications row, so a
+    // muted type is never persisted to the inbox in the first place — not a display-time filter.
+    public boolean wantsNotification(UUID userId, String type) {
+        return userSettings.findById(userId)
+                .map(s -> !Boolean.FALSE.equals(s.getNotificationPrefs().get(type)))
+                .orElse(true);
     }
 
     // Near-identical shape to banAccount: verify the password first (401, no state change, on mismatch —

@@ -1,5 +1,6 @@
 package com.redditclone.notify;
 
+import com.redditclone.auth.AuthService;
 import com.redditclone.common.OutboxWriter;
 import com.redditclone.common.UuidV7Generator;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
@@ -34,12 +35,15 @@ public class NotificationOutboxWorker {
     private final UuidV7Generator ids;
     private final ObjectMapper json;
     private final OutboxWriter outboxWriter;
+    private final AuthService authService;
 
-    public NotificationOutboxWorker(JdbcTemplate jdbc, UuidV7Generator ids, ObjectMapper json, OutboxWriter outboxWriter) {
+    public NotificationOutboxWorker(JdbcTemplate jdbc, UuidV7Generator ids, ObjectMapper json,
+                                     OutboxWriter outboxWriter, AuthService authService) {
         this.jdbc = jdbc;
         this.ids = ids;
         this.json = json;
         this.outboxWriter = outboxWriter;
+        this.authService = authService;
     }
 
     @Scheduled(fixedDelay = 2000)
@@ -61,12 +65,16 @@ public class NotificationOutboxWorker {
         for (Map<String, Object> event : events) {
             try {
                 JsonNode payload = json.readTree(event.get("payload").toString());
-                rows.add(new Object[]{
-                        ids.nextId(),
-                        UUID.fromString(payload.path("userId").asString()),
-                        payload.path("type").asString(),
-                        json.writeValueAsString(payload.path("source"))
-                });
+                UUID userId = UUID.fromString(payload.path("userId").asString());
+                String type = payload.path("type").asString();
+                // Checked here, not by each producer (CommentService/ChatStompHandler) — every
+                // notification-type event already funnels through this one worker before becoming a row,
+                // so this is the single chokepoint to enforce a mute, not N call sites that would each
+                // need to know about preference storage. The outbox event is still marked processed below
+                // either way, same as the existing "unrecognized event_type" skip-and-continue elsewhere.
+                if (authService.wantsNotification(userId, type)) {
+                    rows.add(new Object[]{ids.nextId(), userId, type, json.writeValueAsString(payload.path("source"))});
+                }
             } catch (Exception e) {
                 log.warn("outbox event {} could not be applied, marking processed without applying it: {}", event.get("id"), e.getMessage());
             }
