@@ -23,4 +23,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Noti
     @Modifying
     @Query("UPDATE Notification n SET n.readAt = :readAt WHERE n.id = :id AND n.createdAt = :createdAt")
     void markRead(@Param("id") UUID id, @Param("createdAt") Instant createdAt, @Param("readAt") Instant readAt);
+
+    // Bulk "mark all as read" — avoids the inbox having to loop one markRead call per unread row.
+    @Modifying
+    @Query("UPDATE Notification n SET n.readAt = :readAt WHERE n.userId = :userId AND n.readAt IS NULL")
+    void markAllRead(@Param("userId") UUID userId, @Param("readAt") Instant readAt);
 }

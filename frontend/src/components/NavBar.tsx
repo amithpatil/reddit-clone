@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { CreateMenu } from './CreateMenu';
 import { Logo } from './Logo';
+import { NotificationBell } from './NotificationBell';
 import styles from './NavBar.module.css';
 
 export function NavBar() {
@@ -42,6 +43,7 @@ export function NavBar() {
         {user ? (
           <div className={styles.userMenu}>
             <CreateMenu />
+            <NotificationBell />
             <Link to={`/user/${user.username}`} className={styles.profileLink}>
               <span className={styles.avatar}>{user.username.slice(0, 1)}</span>
               <span className={styles.username}>{user.username}</span>

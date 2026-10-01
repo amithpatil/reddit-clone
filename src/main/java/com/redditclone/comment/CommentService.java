@@ -136,13 +136,13 @@ public class CommentService {
                 outbox.writeEvent("notification", Map.of(
                         "userId", post.getAuthorId(),
                         "type", "post_reply",
-                        "source", Map.of("postId", post.getId(), "communityId", post.getCommunityId())));
+                        "source", Map.of("actorId", authorId, "postId", post.getId(), "communityId", post.getCommunityId())));
             }
         } else if (!parent.getAuthorId().equals(authorId)) {
             outbox.writeEvent("notification", Map.of(
                     "userId", parent.getAuthorId(),
                     "type", "reply",
-                    "source", Map.of("commentId", parent.getId(), "postId", post.getId(), "communityId", post.getCommunityId())));
+                    "source", Map.of("actorId", authorId, "commentId", parent.getId(), "postId", post.getId(), "communityId", post.getCommunityId())));
         }
         notifyMentions(c, post, authorId, sanitizedBody);
     }
@@ -167,7 +167,7 @@ public class CommentService {
                 .<Map<String, Object>>map(mentionedId -> Map.of(
                         "userId", mentionedId,
                         "type", "mention",
-                        "source", Map.of("commentId", c.getId(), "postId", post.getId(), "communityId", post.getCommunityId())))
+                        "source", Map.of("actorId", authorId, "commentId", c.getId(), "postId", post.getId(), "communityId", post.getCommunityId())))
                 .toList();
         outbox.writeEvents("notification", payloads);
     }

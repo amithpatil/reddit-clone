@@ -27,4 +27,9 @@ public class NotificationController {
     public void markRead(@AuthenticationPrincipal UUID userId, @PathVariable UUID id) {
         notificationService.markRead(userId, id);
     }
+
+    @PostMapping("/api/notifications/read-all")
+    public void markAllRead(@AuthenticationPrincipal UUID userId) {
+        notificationService.markAllRead(userId);
+    }
 }

@@ -7,6 +7,7 @@ import { CreateCommunity } from './pages/CreateCommunity';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { ModerationDashboard } from './pages/ModerationDashboard';
+import { NotificationsInbox } from './pages/NotificationsInbox';
 import { PostDetail } from './pages/PostDetail';
 import { PostSubmit } from './pages/PostSubmit';
 import { Register } from './pages/Register';
@@ -33,6 +34,7 @@ function App() {
         <Route path="/r/:communityName" element={<CommunityPage />} />
         <Route path="/communities" element={<CommunityDiscovery />} />
         <Route path="/communities/create" element={<CreateCommunity />} />
+        <Route path="/notifications" element={<NotificationsInbox />} />
         <Route path="/submit" element={<PostSubmit />} />
         <Route path="/user/:username" element={<UserProfile />} />
       </Route>

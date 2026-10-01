@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import org.hibernate.annotations.ColumnTransformer;
 
 import java.time.Instant;
@@ -30,7 +31,7 @@ public class Notification {
     private UUID userId;
 
     @Column(nullable = false)
-    private String type; // reply | post_reply | mention
+    private String type; // reply | post_reply | mention | chat_message
 
     // Same plain-String + columnTransformer convention as every other JSONB column in this codebase.
     @ColumnTransformer(write = "?::jsonb")
@@ -39,6 +40,18 @@ public class Notification {
 
     @Column(name = "read_at")
     private Instant readAt;
+
+    // Attached batched, server-side, by NotificationService.listForUser — same @Transient
+    // attach-plus-batched-lookup pattern as ModQueueEntry.preview/authorUsername (F8). Null where the
+    // type doesn't carry that field (e.g. no postTitle/communityName on a chat_message row).
+    @Transient
+    private String postTitle;
+
+    @Transient
+    private String communityName;
+
+    @Transient
+    private String actorUsername;
 
     public UUID getId() {
         return id;
@@ -82,5 +95,29 @@ public class Notification {
 
     public void setReadAt(Instant readAt) {
         this.readAt = readAt;
+    }
+
+    public String getPostTitle() {
+        return postTitle;
+    }
+
+    public void setPostTitle(String postTitle) {
+        this.postTitle = postTitle;
+    }
+
+    public String getCommunityName() {
+        return communityName;
+    }
+
+    public void setCommunityName(String communityName) {
+        this.communityName = communityName;
+    }
+
+    public String getActorUsername() {
+        return actorUsername;
+    }
+
+    public void setActorUsername(String actorUsername) {
+        this.actorUsername = actorUsername;
     }
 }
