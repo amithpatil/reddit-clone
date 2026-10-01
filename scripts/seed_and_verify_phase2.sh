@@ -218,11 +218,11 @@ sleep $TICK_WAIT
 sleep $TICK_WAIT
 
 req GET "/r/$RANK_COMM/comments/$COMMENTS_POST_ID" ""
-FIRST_COMMENT_ID=$(echo "$HTTP_BODY" | jq -r '.comments[0].id')
-A_SCORE=$(echo "$HTTP_BODY" | jq -r ".comments[] | select(.id==\"$COMMENT_A\") | .score")
-B_SCORE=$(echo "$HTTP_BODY" | jq -r ".comments[] | select(.id==\"$COMMENT_B\") | .score")
-A_BEST=$(echo "$HTTP_BODY" | jq -r ".comments[] | select(.id==\"$COMMENT_A\") | .bestRank")
-B_BEST=$(echo "$HTTP_BODY" | jq -r ".comments[] | select(.id==\"$COMMENT_B\") | .bestRank")
+FIRST_COMMENT_ID=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[0].data.id')
+A_SCORE=$(echo "$HTTP_BODY" | jq -r ".comments.data.children[].data | select(.id==\"$COMMENT_A\") | .score")
+B_SCORE=$(echo "$HTTP_BODY" | jq -r ".comments.data.children[].data | select(.id==\"$COMMENT_B\") | .score")
+A_BEST=$(echo "$HTTP_BODY" | jq -r ".comments.data.children[].data | select(.id==\"$COMMENT_A\") | .bestRank")
+B_BEST=$(echo "$HTTP_BODY" | jq -r ".comments.data.children[].data | select(.id==\"$COMMENT_B\") | .bestRank")
 if [ "$A_SCORE" = "$B_SCORE" ] && [ "$FIRST_COMMENT_ID" = "$COMMENT_B" ] && awk "BEGIN{exit !($B_BEST > $A_BEST)}"; then
   record PASS "equal-score comments ranked by Wilson confidence, not raw score" "A(1 up/0 down): score=$A_SCORE bestRank=$A_BEST — B(8 up/7 down): score=$B_SCORE bestRank=$B_BEST — B ranks first"
 else

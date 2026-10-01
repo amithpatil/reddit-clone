@@ -162,9 +162,9 @@ expect_status "unhide the post" "200" "$HTTP_STATUS" "-"
 req POST /api/hide "{\"targetType\":\"comment\",\"targetId\":\"$REPLY_ID\"}" -H "Authorization: Bearer $OWNER"
 expect_status "hide a comment" "200" "$HTTP_STATUS" "-"
 req GET "/r/$COMM/comments/$POST_ID" "" -H "Authorization: Bearer $OWNER"
-OWNER_COMMENT_COUNT=$(echo "$HTTP_BODY" | jq '.comments | length')
+OWNER_COMMENT_COUNT=$(echo "$HTTP_BODY" | jq '.comments.data.children | length')
 req GET "/r/$COMM/comments/$POST_ID" ""
-ANON_COMMENT_COUNT=$(echo "$HTTP_BODY" | jq '.comments | length')
+ANON_COMMENT_COUNT=$(echo "$HTTP_BODY" | jq '.comments.data.children | length')
 if [ "$ANON_COMMENT_COUNT" -gt "$OWNER_COMMENT_COUNT" ]; then
   record PASS "hiding a comment removes it only for the hiding viewer" "anon=$ANON_COMMENT_COUNT owner=$OWNER_COMMENT_COUNT"
 else

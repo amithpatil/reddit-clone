@@ -14,9 +14,10 @@ interface CommentThreadProps {
   comment: CommentNode;
   onVote: (commentId: string, dir: 1 | -1) => void;
   onReply: (parentId: string, body: string) => Promise<void>;
+  onLoadMoreReplies: (parentId: string) => void;
 }
 
-export function CommentThread({ comment, onVote, onReply }: CommentThreadProps) {
+export function CommentThread({ comment, onVote, onReply, onLoadMoreReplies }: CommentThreadProps) {
   const [replying, setReplying] = useState(false);
 
   const handleReply = async (body: string) => {
@@ -52,11 +53,16 @@ export function CommentThread({ comment, onVote, onReply }: CommentThreadProps) 
           )}
         </div>
       </div>
-      {comment.replies.length > 0 && (
+      {(comment.replies.length > 0 || comment.repliesAfter !== null) && (
         <div className={styles.replies}>
           {comment.replies.map((reply) => (
-            <CommentThread key={reply.id} comment={reply} onVote={onVote} onReply={onReply} />
+            <CommentThread key={reply.id} comment={reply} onVote={onVote} onReply={onReply} onLoadMoreReplies={onLoadMoreReplies} />
           ))}
+          {comment.repliesAfter !== null && (
+            <button type="button" className={styles.loadMoreReplies} onClick={() => onLoadMoreReplies(comment.id)}>
+              {comment.childCount - comment.replies.length} more {comment.childCount - comment.replies.length === 1 ? 'reply' : 'replies'}
+            </button>
+          )}
         </div>
       )}
     </div>

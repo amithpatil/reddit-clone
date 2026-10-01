@@ -22,66 +22,206 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     // "[removed]", see CommentView — so any replies underneath it stay attached in the nested tree F3
     // builds (CommentService.findCommentTree). Excluding the row entirely would silently orphan its whole
     // reply subtree once replies became readable at all, which they weren't until F3.
+    // Keyset cursor (feature 8) — same shape as PostRepository's hot/top/controversial queries.
     @Query("""
             SELECT c FROM Comment c
             WHERE c.postId = :postId AND c.parentId IS NULL
+              AND (c.bestRank < :cursorRank OR (c.bestRank = :cursorRank AND c.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.bestRank DESC, c.id DESC
             """)
-    List<Comment> findTopLevelByBest(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit); // capped, never unbounded
+    List<Comment> findTopLevelByBest(@Param("postId") UUID postId, @Param("cursorRank") double cursorRank,
+                                      @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
 
     @Query("""
             SELECT c FROM Comment c
             WHERE c.postId = :postId AND c.parentId IS NULL
+              AND (c.score < :cursorScore OR (c.score = :cursorScore AND c.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.score DESC, c.id DESC
             """)
-    List<Comment> findTopLevelByTop(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+    List<Comment> findTopLevelByTop(@Param("postId") UUID postId, @Param("cursorScore") int cursorScore,
+                                     @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
 
     @Query("""
             SELECT c FROM Comment c
             WHERE c.postId = :postId AND c.parentId IS NULL
+              AND (c.createdAt < :cursorCreatedAt OR (c.createdAt = :cursorCreatedAt AND c.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.createdAt DESC, c.id DESC
             """)
-    List<Comment> findTopLevelByNew(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+    List<Comment> findTopLevelByNew(@Param("postId") UUID postId, @Param("cursorCreatedAt") Instant cursorCreatedAt,
+                                     @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
 
-    // Ascending throughout (not mixed with a descending tiebreaker) so a future keyset cursor over this
-    // sort has a consistent direction to compare against — see the comment sort feature's plan.
+    // Ascending throughout (not mixed with a descending tiebreaker), as this comment already anticipated
+    // for feature 8 — the keyset predicate direction is ">" not "<" to match. See Cursor.FIRST_PAGE_ASC
+    // for the matching first-page sentinel this sort needs (FIRST_PAGE's year-9999 sentinel would match
+    // nothing under a ">" comparison).
     @Query("""
             SELECT c FROM Comment c
             WHERE c.postId = :postId AND c.parentId IS NULL
+              AND (c.createdAt > :cursorCreatedAt OR (c.createdAt = :cursorCreatedAt AND c.id > :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.createdAt ASC, c.id ASC
             """)
-    List<Comment> findTopLevelByOld(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+    List<Comment> findTopLevelByOld(@Param("postId") UUID postId, @Param("cursorCreatedAt") Instant cursorCreatedAt,
+                                     @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
 
     @Query("""
             SELECT c FROM Comment c
             WHERE c.postId = :postId AND c.parentId IS NULL
+              AND (c.controversialRank < :cursorRank OR (c.controversialRank = :cursorRank AND c.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
             ORDER BY c.controversialRank DESC, c.id DESC
             """)
-    List<Comment> findTopLevelByControversial(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId, Pageable limit);
+    List<Comment> findTopLevelByControversial(@Param("postId") UUID postId, @Param("cursorRank") double cursorRank,
+                                               @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
 
-    // Every non-root comment for the post, unfiltered by `removed` for the same reason as the root queries
-    // above. No pagination and no ORDER BY — CommentService.findCommentTree groups these by parentId and
-    // sorts each sibling group in Java with the comparator matching the chosen sort, so the DB order here
-    // doesn't matter. Unbounded is an accepted, deliberate scope boundary (bounded naturally by the
-    // existing MAX_DEPTH=10 cap on reply depth) — real pagination/lazy-loading for huge threads is still
-    // backend feature 8's job, not this one's.
+    // Bounds a page of roots' *entire* reply subtrees (every depth, not just direct children) at
+    // :limitPerRoot total per root — the fix for the previous findRepliesByPostId's unbounded fetch.
+    // subpath(path, 0, 1) is a root's own ltree label (a root's path IS just its own label, no dots), so
+    // partitioning by it gives each root on this page an independent budget — one popular root can't
+    // starve the others. rootLabels is the current page's roots' own .getPath() values, already in hand.
+    // Returns ranked ids only, not full entities — same reasoning as PostRepository.searchIds/searchAllIds
+    // (a native query selecting c.* risks Hibernate entity-mapping friction over the extra "rn" column);
+    // CommentService.findCommentTree re-fetches via the ordinary, safely-mapped findAllById. Truncation
+    // ranks a root's whole subtree together, not per-parent, so it isn't guaranteed to cut at clean
+    // sibling-group boundaries — accepted, see this feature's plan for why that's still correct for the
+    // childCount-vs-replies.size() truncation signal regardless.
+    @Query(value = """
+            SELECT id FROM (
+              SELECT c.id, ROW_NUMBER() OVER (PARTITION BY subpath(c.path, 0, 1)::text ORDER BY c.best_rank DESC, c.id DESC) AS rn
+              FROM comments c
+              WHERE c.post_id = :postId AND c.parent_id IS NOT NULL
+                AND subpath(c.path, 0, 1)::text IN (:rootLabels)
+                AND (:viewerId IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM hidden_items h WHERE h.user_id = :viewerId AND h.target_type = 'comment' AND h.target_id = c.id))
+            ) sub
+            WHERE sub.rn <= :limitPerRoot
+            """, nativeQuery = true)
+    List<UUID> findBoundedReplyIdsByBest(@Param("postId") UUID postId, @Param("rootLabels") List<String> rootLabels,
+                                          @Param("viewerId") UUID viewerId, @Param("limitPerRoot") int limitPerRoot);
+
+    @Query(value = """
+            SELECT id FROM (
+              SELECT c.id, ROW_NUMBER() OVER (PARTITION BY subpath(c.path, 0, 1)::text ORDER BY c.score DESC, c.id DESC) AS rn
+              FROM comments c
+              WHERE c.post_id = :postId AND c.parent_id IS NOT NULL
+                AND subpath(c.path, 0, 1)::text IN (:rootLabels)
+                AND (:viewerId IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM hidden_items h WHERE h.user_id = :viewerId AND h.target_type = 'comment' AND h.target_id = c.id))
+            ) sub
+            WHERE sub.rn <= :limitPerRoot
+            """, nativeQuery = true)
+    List<UUID> findBoundedReplyIdsByTop(@Param("postId") UUID postId, @Param("rootLabels") List<String> rootLabels,
+                                         @Param("viewerId") UUID viewerId, @Param("limitPerRoot") int limitPerRoot);
+
+    @Query(value = """
+            SELECT id FROM (
+              SELECT c.id, ROW_NUMBER() OVER (PARTITION BY subpath(c.path, 0, 1)::text ORDER BY c.created_at DESC, c.id DESC) AS rn
+              FROM comments c
+              WHERE c.post_id = :postId AND c.parent_id IS NOT NULL
+                AND subpath(c.path, 0, 1)::text IN (:rootLabels)
+                AND (:viewerId IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM hidden_items h WHERE h.user_id = :viewerId AND h.target_type = 'comment' AND h.target_id = c.id))
+            ) sub
+            WHERE sub.rn <= :limitPerRoot
+            """, nativeQuery = true)
+    List<UUID> findBoundedReplyIdsByNew(@Param("postId") UUID postId, @Param("rootLabels") List<String> rootLabels,
+                                         @Param("viewerId") UUID viewerId, @Param("limitPerRoot") int limitPerRoot);
+
+    @Query(value = """
+            SELECT id FROM (
+              SELECT c.id, ROW_NUMBER() OVER (PARTITION BY subpath(c.path, 0, 1)::text ORDER BY c.created_at ASC, c.id ASC) AS rn
+              FROM comments c
+              WHERE c.post_id = :postId AND c.parent_id IS NOT NULL
+                AND subpath(c.path, 0, 1)::text IN (:rootLabels)
+                AND (:viewerId IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM hidden_items h WHERE h.user_id = :viewerId AND h.target_type = 'comment' AND h.target_id = c.id))
+            ) sub
+            WHERE sub.rn <= :limitPerRoot
+            """, nativeQuery = true)
+    List<UUID> findBoundedReplyIdsByOld(@Param("postId") UUID postId, @Param("rootLabels") List<String> rootLabels,
+                                         @Param("viewerId") UUID viewerId, @Param("limitPerRoot") int limitPerRoot);
+
+    @Query(value = """
+            SELECT id FROM (
+              SELECT c.id, ROW_NUMBER() OVER (PARTITION BY subpath(c.path, 0, 1)::text ORDER BY c.controversial_rank DESC, c.id DESC) AS rn
+              FROM comments c
+              WHERE c.post_id = :postId AND c.parent_id IS NOT NULL
+                AND subpath(c.path, 0, 1)::text IN (:rootLabels)
+                AND (:viewerId IS NULL OR NOT EXISTS (
+                    SELECT 1 FROM hidden_items h WHERE h.user_id = :viewerId AND h.target_type = 'comment' AND h.target_id = c.id))
+            ) sub
+            WHERE sub.rn <= :limitPerRoot
+            """, nativeQuery = true)
+    List<UUID> findBoundedReplyIdsByControversial(@Param("postId") UUID postId, @Param("rootLabels") List<String> rootLabels,
+                                                    @Param("viewerId") UUID viewerId, @Param("limitPerRoot") int limitPerRoot);
+
+    // Direct children of one specific comment, paginated — backs GET /api/morechildren. Exactly the same
+    // shape as the root queries above (keyset cursor per sort), just c.parentId = :parentId instead of
+    // c.parentId IS NULL. No ltree/window function needed here: only one parent is in scope per call,
+    // unlike the multi-root bounding above.
     @Query("""
             SELECT c FROM Comment c
-            WHERE c.postId = :postId AND c.parentId IS NOT NULL
+            WHERE c.parentId = :parentId
+              AND (c.bestRank < :cursorRank OR (c.bestRank = :cursorRank AND c.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.bestRank DESC, c.id DESC
             """)
-    List<Comment> findRepliesByPostId(@Param("postId") UUID postId, @Param("viewerId") UUID viewerId);
+    List<Comment> findChildrenByBest(@Param("parentId") UUID parentId, @Param("cursorRank") double cursorRank,
+                                      @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.parentId = :parentId
+              AND (c.score < :cursorScore OR (c.score = :cursorScore AND c.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.score DESC, c.id DESC
+            """)
+    List<Comment> findChildrenByTop(@Param("parentId") UUID parentId, @Param("cursorScore") int cursorScore,
+                                     @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.parentId = :parentId
+              AND (c.createdAt < :cursorCreatedAt OR (c.createdAt = :cursorCreatedAt AND c.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.createdAt DESC, c.id DESC
+            """)
+    List<Comment> findChildrenByNew(@Param("parentId") UUID parentId, @Param("cursorCreatedAt") Instant cursorCreatedAt,
+                                     @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    // Ascending direction — see findTopLevelByOld's comment and Cursor.FIRST_PAGE_ASC.
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.parentId = :parentId
+              AND (c.createdAt > :cursorCreatedAt OR (c.createdAt = :cursorCreatedAt AND c.id > :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.createdAt ASC, c.id ASC
+            """)
+    List<Comment> findChildrenByOld(@Param("parentId") UUID parentId, @Param("cursorCreatedAt") Instant cursorCreatedAt,
+                                     @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
+
+    @Query("""
+            SELECT c FROM Comment c
+            WHERE c.parentId = :parentId
+              AND (c.controversialRank < :cursorRank OR (c.controversialRank = :cursorRank AND c.id < :cursorId))
+              AND (:viewerId IS NULL OR NOT EXISTS (
+                  SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))
+            ORDER BY c.controversialRank DESC, c.id DESC
+            """)
+    List<Comment> findChildrenByControversial(@Param("parentId") UUID parentId, @Param("cursorRank") double cursorRank,
+                                                @Param("cursorId") UUID cursorId, @Param("viewerId") UUID viewerId, Pageable limit);
 
     // clearAutomatically: without it, a `parent` entity already loaded in this transaction (see
     // CommentService.reply) keeps its stale pre-increment childCount in the persistence context, and a

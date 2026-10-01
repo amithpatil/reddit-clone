@@ -1,5 +1,6 @@
 package com.redditclone.comment;
 
+import com.redditclone.comment.dto.CommentView;
 import com.redditclone.comment.dto.PostWithCommentsView;
 import com.redditclone.comment.dto.ReplyRequest;
 import com.redditclone.comment.dto.UserCommentView;
@@ -47,7 +48,8 @@ public class CommentController {
     @GetMapping("/r/{communityName}/comments/{postId}")
     public PostWithCommentsView getPostWithComments(@AuthenticationPrincipal UUID viewerId,
                                                       @PathVariable String communityName, @PathVariable UUID postId,
-                                                      @RequestParam(required = false, defaultValue = "best") String sort) {
+                                                      @RequestParam(required = false, defaultValue = "best") String sort,
+                                                      @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
         communityService.requireViewAccess(viewerId, communityId);
         var post = postService.findByIdWithMedia(postId);
@@ -57,8 +59,18 @@ public class CommentController {
         if (post.isRemoved() || !post.getCommunityId().equals(communityId)) {
             throw new NotFoundException("post not found");
         }
-        var comments = commentService.findCommentTree(postId, viewerId, sort);
+        var comments = commentService.findCommentTree(postId, viewerId, sort, after);
         return new PostWithCommentsView(post, comments);
+    }
+
+    // No communityName in this route at all — findMoreChildren looks the post's community up itself via
+    // postId for the view-access check, the same shape as CommentService.reply already does for the same
+    // reason (it needs communityId anyway, so a second path segment would be pure redundancy here).
+    @GetMapping("/api/morechildren")
+    public Listing<CommentView> moreChildren(@AuthenticationPrincipal UUID viewerId,
+                                              @RequestParam UUID postId, @RequestParam UUID parentId,
+                                              @RequestParam String sort, @RequestParam(required = false) String after) {
+        return commentService.findMoreChildren(postId, parentId, viewerId, sort, after);
     }
 
     private static final String COMMENT_KIND = "t1";

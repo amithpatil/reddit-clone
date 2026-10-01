@@ -11,6 +11,12 @@ import com.redditclone.common.VoteDelta;
 import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
+import com.redditclone.common.paging.Cursor;
+import com.redditclone.common.paging.CursorCodec;
+import com.redditclone.common.paging.Listing;
+import com.redditclone.common.paging.RankCursor;
+import com.redditclone.common.paging.RankCursorCodec;
+import com.redditclone.common.paging.Thing;
 import com.redditclone.common.text.Sanitizer;
 import com.redditclone.community.CommunityService;
 import com.redditclone.post.Post;
@@ -40,6 +46,10 @@ public class CommentService {
 
     private static final int MAX_DEPTH = 10;
     private static final int TOP_LEVEL_PAGE_SIZE = 50;
+    // Feature 8: caps each page-of-roots' *entire* reply subtree (all depths) at this many per root, and
+    // is also the page size for GET /api/morechildren's direct-children follow-up calls.
+    private static final int REPLY_PAGE_SIZE = 50;
+    private static final String COMMENT_KIND = "t1";
     // u/{username} mention detection. Registration itself allows any characters in a username (no
     // @Pattern on RegisterRequest), but restricting what's *mentionable* to the conventional
     // [A-Za-z0-9_] set (matching how comment ltree labels already treat "safe" identifier characters
@@ -173,14 +183,22 @@ public class CommentService {
     }
 
     // best is Reddit's own default (Wilson confidence, not raw score). Builds a genuinely nested tree
-    // (CommentView.replies), not a flat top-level-only list — see F3's plan. Root comments are still
-    // capped at TOP_LEVEL_PAGE_SIZE with no cursor (real pagination is feature 8's job), but every reply
-    // beneath a root is fetched eagerly and sorted recursively at every depth with the same comparator
-    // logic as the root query's own ORDER BY, matching how Reddit itself sorts a whole thread, not just
-    // its first level.
-    public List<CommentView> findCommentTree(UUID postId, UUID viewerId, String sort) {
-        List<Comment> roots = findTopLevel(postId, viewerId, sort);
-        List<Comment> replies = comments.findRepliesByPostId(postId, viewerId);
+    // (CommentView.replies), not a flat top-level-only list — see F3's plan. Root comments are now really
+    // paginated (feature 8) via the same keyset-cursor primitives PostController's feeds already use.
+    // Each page of roots' entire reply subtree (every depth, not just direct children) is fetched eagerly,
+    // bounded at REPLY_PAGE_SIZE per root — see findBoundedReplyIds — and sorted recursively at every
+    // depth with the same comparator logic as the root query's own ORDER BY, matching how Reddit itself
+    // sorts a whole thread, not just its first level. A node whose childCount exceeds how many of its
+    // children actually made it into this bounded set (CommentView.childCount vs .replies.size(), checked
+    // client-side) gets a "N more replies" affordance resolved via findMoreChildren below.
+    public Listing<CommentView> findCommentTree(UUID postId, UUID viewerId, String sort, String after) {
+        List<Comment> roots = findTopLevel(postId, viewerId, sort, after);
+        if (roots.isEmpty()) {
+            return Listing.of(List.of(), null);
+        }
+        List<String> rootLabels = roots.stream().map(Comment::getPath).toList();
+        List<UUID> replyIds = findBoundedReplyIds(postId, rootLabels, viewerId, sort);
+        List<Comment> replies = replyIds.isEmpty() ? List.of() : comments.findAllById(replyIds);
 
         List<Comment> all = new ArrayList<>(roots);
         all.addAll(replies);
@@ -191,26 +209,135 @@ public class CommentService {
             childrenByParent.computeIfAbsent(c.getParentId(), k -> new ArrayList<>()).add(c);
         }
         Comparator<Comment> comparator = comparatorFor(sort);
-        return roots.stream().map(r -> toViewRecursive(r, childrenByParent, comparator)).toList();
+        List<CommentView> views = roots.stream().map(r -> toViewRecursive(r, childrenByParent, comparator, sort)).toList();
+        List<Thing<CommentView>> children = views.stream().map(v -> new Thing<>(COMMENT_KIND, v)).toList();
+        String next = roots.size() < TOP_LEVEL_PAGE_SIZE ? null : encodeCommentCursor(sort, roots.getLast());
+        return Listing.of(children, next);
     }
 
-    private CommentView toViewRecursive(Comment c, Map<UUID, List<Comment>> childrenByParent, Comparator<Comment> comparator) {
-        List<Comment> kids = childrenByParent.getOrDefault(c.getId(), List.of());
-        List<CommentView> childViews = kids.stream()
-                .sorted(comparator)
-                .map(k -> toViewRecursive(k, childrenByParent, comparator))
+    // GET /api/morechildren — the next page of one specific comment's *direct* children only (not deeper),
+    // unlike findCommentTree's richer multi-level eager fetch above. Accepted simplification (see this
+    // feature's plan): a freshly-loaded child whose own childCount > 0 shows its own "more replies"
+    // affordance immediately, resolved by another call scoped to that child — keeps this query a plain
+    // single-parent keyset page with no window function/ltree needed, unlike the multi-root case above.
+    public Listing<CommentView> findMoreChildren(UUID postId, UUID parentId, UUID viewerId, String sort, String after) {
+        Post post = postService.findById(postId);
+        communityService.requireViewAccess(viewerId, post.getCommunityId());
+        Comment parent = findById(parentId);
+        if (!parent.getPostId().equals(postId)) {
+            throw new NotFoundException("parent comment not found");
+        }
+        Pageable limit = Pageable.ofSize(REPLY_PAGE_SIZE);
+        List<Comment> page = switch (sort) {
+            case "best" -> {
+                RankCursor cursor = RankCursorCodec.decode(after, sort);
+                yield comments.findChildrenByBest(parentId, cursor.rank(), cursor.id(), viewerId, limit);
+            }
+            case "top" -> {
+                RankCursor cursor = RankCursorCodec.decode(after, sort);
+                yield comments.findChildrenByTop(parentId, (int) cursor.rank(), cursor.id(), viewerId, limit);
+            }
+            case "new" -> {
+                Cursor cursor = decodeTimeCursor(after, sort);
+                yield comments.findChildrenByNew(parentId, cursor.createdAt(), cursor.id(), viewerId, limit);
+            }
+            case "old" -> {
+                Cursor cursor = decodeTimeCursor(after, sort);
+                yield comments.findChildrenByOld(parentId, cursor.createdAt(), cursor.id(), viewerId, limit);
+            }
+            case "controversial" -> {
+                RankCursor cursor = RankCursorCodec.decode(after, sort);
+                yield comments.findChildrenByControversial(parentId, cursor.rank(), cursor.id(), viewerId, limit);
+            }
+            default -> throw new BadRequestException("invalid comment sort");
+        };
+        attachAuthorUsernames(page);
+        // repliesAfter: "" (not null) whenever this freshly-loaded child has any real children of its own
+        // (childCount > 0) — replies is always empty here (see this method's own comment), so childCount
+        // alone decides it; "" correctly starts that child's own future morechildren call from scratch,
+        // same reasoning as toViewRecursive's identical empty-kids case.
+        List<CommentView> views = page.stream()
+                .map(c -> CommentView.from(c, List.of(), c.getChildCount() > 0 ? "" : null))
                 .toList();
-        return CommentView.from(c, childViews);
+        List<Thing<CommentView>> children = views.stream().map(v -> new Thing<>(COMMENT_KIND, v)).toList();
+        String next = page.size() < REPLY_PAGE_SIZE ? null : encodeCommentCursor(sort, page.getLast());
+        return Listing.of(children, next);
     }
 
-    private List<Comment> findTopLevel(UUID postId, UUID viewerId, String sort) {
+    private CommentView toViewRecursive(Comment c, Map<UUID, List<Comment>> childrenByParent, Comparator<Comment> comparator, String sort) {
+        List<Comment> kids = childrenByParent.getOrDefault(c.getId(), List.of()).stream().sorted(comparator).toList();
+        List<CommentView> childViews = kids.stream()
+                .map(k -> toViewRecursive(k, childrenByParent, comparator, sort))
+                .toList();
+        // Non-null exactly when this node's own direct children were truncated by the per-root reply
+        // budget (childCount vs how many actually made it into `kids`) — see CommentView's own comment.
+        // Empty string (not a real encoded cursor) specifically for "truncated but zero of this node's
+        // children happened to make the cut" — passing that straight through as morechildren's blank
+        // `after` correctly starts that call from page 1 of this parent's children, which is exactly
+        // right here since nothing of this parent's own is visible yet to overlap with.
+        String repliesAfter = kids.size() >= c.getChildCount() ? null
+                : kids.isEmpty() ? "" : encodeCommentCursor(sort, kids.getLast());
+        return CommentView.from(c, childViews, repliesAfter);
+    }
+
+    private List<Comment> findTopLevel(UUID postId, UUID viewerId, String sort, String after) {
         Pageable limit = Pageable.ofSize(TOP_LEVEL_PAGE_SIZE);
         return switch (sort) {
-            case "best" -> comments.findTopLevelByBest(postId, viewerId, limit);
-            case "top" -> comments.findTopLevelByTop(postId, viewerId, limit);
-            case "new" -> comments.findTopLevelByNew(postId, viewerId, limit);
-            case "old" -> comments.findTopLevelByOld(postId, viewerId, limit);
-            case "controversial" -> comments.findTopLevelByControversial(postId, viewerId, limit);
+            case "best" -> {
+                RankCursor cursor = RankCursorCodec.decode(after, sort);
+                yield comments.findTopLevelByBest(postId, cursor.rank(), cursor.id(), viewerId, limit);
+            }
+            case "top" -> {
+                RankCursor cursor = RankCursorCodec.decode(after, sort);
+                yield comments.findTopLevelByTop(postId, (int) cursor.rank(), cursor.id(), viewerId, limit);
+            }
+            case "new" -> {
+                Cursor cursor = decodeTimeCursor(after, sort);
+                yield comments.findTopLevelByNew(postId, cursor.createdAt(), cursor.id(), viewerId, limit);
+            }
+            case "old" -> {
+                Cursor cursor = decodeTimeCursor(after, sort);
+                yield comments.findTopLevelByOld(postId, cursor.createdAt(), cursor.id(), viewerId, limit);
+            }
+            case "controversial" -> {
+                RankCursor cursor = RankCursorCodec.decode(after, sort);
+                yield comments.findTopLevelByControversial(postId, cursor.rank(), cursor.id(), viewerId, limit);
+            }
+            default -> throw new BadRequestException("invalid comment sort");
+        };
+    }
+
+    // "old" is this codebase's only ascending-sorted paginated listing — a blank/missing `after` needs
+    // Cursor.FIRST_PAGE_ASC (older/lower than any real row), not the shared FIRST_PAGE sentinel every
+    // descending listing uses (which would match nothing under old's ">" keyset comparison). A real,
+    // previously-encoded token round-trips the same way regardless of direction, so only the blank case
+    // needs this branch.
+    private Cursor decodeTimeCursor(String after, String sort) {
+        if (after == null || after.isBlank()) {
+            return "old".equals(sort) ? Cursor.FIRST_PAGE_ASC : Cursor.FIRST_PAGE;
+        }
+        return CursorCodec.decode(after);
+    }
+
+    private List<UUID> findBoundedReplyIds(UUID postId, List<String> rootLabels, UUID viewerId, String sort) {
+        return switch (sort) {
+            case "best" -> comments.findBoundedReplyIdsByBest(postId, rootLabels, viewerId, REPLY_PAGE_SIZE);
+            case "top" -> comments.findBoundedReplyIdsByTop(postId, rootLabels, viewerId, REPLY_PAGE_SIZE);
+            case "new" -> comments.findBoundedReplyIdsByNew(postId, rootLabels, viewerId, REPLY_PAGE_SIZE);
+            case "old" -> comments.findBoundedReplyIdsByOld(postId, rootLabels, viewerId, REPLY_PAGE_SIZE);
+            case "controversial" -> comments.findBoundedReplyIdsByControversial(postId, rootLabels, viewerId, REPLY_PAGE_SIZE);
+            default -> throw new BadRequestException("invalid comment sort");
+        };
+    }
+
+    // Shared by findCommentTree's top-level cursor and findMoreChildren's direct-children cursor — both
+    // page over a Comment list ordered by the same per-sort column, so the same encoding applies to either.
+    private String encodeCommentCursor(String sort, Comment last) {
+        return switch (sort) {
+            case "best" -> RankCursorCodec.encode(sort, last.getBestRank(), last.getId(), null);
+            case "top" -> RankCursorCodec.encode(sort, last.getScore(), last.getId(), null);
+            case "new", "old" -> CursorCodec.encode(last.getCreatedAt(), last.getId());
+            case "controversial" -> RankCursorCodec.encode(sort, last.getControversialRank(), last.getId(), null);
             default -> throw new BadRequestException("invalid comment sort");
         };
     }

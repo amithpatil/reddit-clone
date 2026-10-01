@@ -76,7 +76,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/r/*/new", "/r/*/hot", "/r/*/top", "/r/*/rising",
                                 "/r/*/controversial", "/r/*/search", "/r/*/comments/*", "/user/*/about",
                                 "/user/*/submitted", "/user/*/comments", "/r/*/flairs",
-                                "/r/*/pinned", "/r/*/rules", "/r", "/r/search", "/r/*/about", "/user/search")
+                                "/r/*/pinned", "/r/*/rules", "/r", "/r/search", "/r/*/about", "/user/search",
+                                "/api/morechildren")
                         .permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         // The WebSocket handshake is a plain HTTP GET that a browser-native WebSocket

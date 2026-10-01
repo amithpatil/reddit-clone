@@ -63,3 +63,18 @@
   padding-left: var(--space-3);
   margin-left: var(--space-2);
 }
+
+.loadMoreReplies {
+  display: block;
+  border: none;
+  background: transparent;
+  padding: var(--space-1) 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-link);
+  cursor: pointer;
+}
+
+.loadMoreReplies:hover {
+  text-decoration: underline;
+}

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fetchMyCommentVotes, fetchPostWithComments, postComment } from '../lib/commentApi';
+import { fetchMoreChildren, fetchMyCommentVotes, fetchPostWithComments, postComment } from '../lib/commentApi';
 import { castVote, removeVote } from '../lib/feedApi';
 import type { CommentNode, CommentSortType } from '../types/comment';
 import type { Post } from '../types/post';
@@ -21,14 +21,27 @@ function updateNode(nodes: CommentNode[], id: string, updater: (n: CommentNode) 
   });
 }
 
+function findNode(nodes: CommentNode[], id: string): CommentNode | undefined {
+  for (const n of nodes) {
+    if (n.id === id) return n;
+    const found = findNode(n.replies, id);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 interface UsePostDetailResult {
   post: Post | null;
   comments: CommentNode[];
   loading: boolean;
   error: string | null;
+  hasMoreComments: boolean;
+  loadingMoreComments: boolean;
+  loadMoreComments: () => void;
   applyPostVote: (dir: 1 | -1) => void;
   applyCommentVote: (commentId: string, dir: 1 | -1) => void;
   submitComment: (parentId: string | null, body: string) => Promise<void>;
+  loadMoreReplies: (parentId: string) => void;
 }
 
 export function usePostDetail(communityName: string, postId: string, sort: CommentSortType): UsePostDetailResult {
@@ -36,8 +49,24 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
   const [post, setPost] = useState<Post | null>(null);
   const [comments, setComments] = useState<CommentNode[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [after, setAfter] = useState<string | null>(null);
   const requestId = useRef(0);
+
+  const mergeMyVotes = useCallback(
+    async (tree: CommentNode[]): Promise<CommentNode[]> => {
+      if (!user || tree.length === 0) return tree;
+      try {
+        const votes = await fetchMyCommentVotes(flattenIds(tree));
+        return mergeVotes(tree, votes);
+      } catch {
+        // Vote-state overlay is best-effort — the thread still renders without it.
+        return tree;
+      }
+    },
+    [user],
+  );
 
   const load = useCallback(async () => {
     const id = ++requestId.current;
@@ -46,28 +75,43 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
     try {
       const data = await fetchPostWithComments(communityName, postId, sort);
       if (id !== requestId.current) return;
-      let tree = data.comments;
-      if (user) {
-        try {
-          const votes = await fetchMyCommentVotes(flattenIds(tree));
-          if (id !== requestId.current) return;
-          tree = mergeVotes(tree, votes);
-        } catch {
-          // Vote-state overlay is best-effort — the thread still renders without it.
-        }
-      }
+      const tree = await mergeMyVotes(data.comments.data.children.map((c) => c.data));
+      if (id !== requestId.current) return;
       setPost(data.post);
       setComments(tree);
+      setAfter(data.comments.data.after);
     } catch {
       if (id === requestId.current) setError('Could not load this post. It may have been removed.');
     } finally {
       if (id === requestId.current) setLoading(false);
     }
-  }, [communityName, postId, sort, user]);
+  }, [communityName, postId, sort, mergeMyVotes]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  // Real top-level comment pagination (feature 8) — appends the next page of root comments, same
+  // "requestId guard + append, not replace" shape as useFeed.loadMore.
+  const loadMoreComments = useCallback(() => {
+    if (loadingMoreComments || loading || after === null) return;
+    const id = requestId.current;
+    setLoadingMoreComments(true);
+    (async () => {
+      try {
+        const data = await fetchPostWithComments(communityName, postId, sort, after);
+        if (id !== requestId.current) return;
+        const page = await mergeMyVotes(data.comments.data.children.map((c) => c.data));
+        if (id !== requestId.current) return;
+        setComments((prev) => [...prev, ...page]);
+        setAfter(data.comments.data.after);
+      } catch {
+        if (id === requestId.current) setError('Could not load more comments.');
+      } finally {
+        if (id === requestId.current) setLoadingMoreComments(false);
+      }
+    })();
+  }, [communityName, postId, sort, after, loading, loadingMoreComments, mergeMyVotes]);
 
   // Same optimistic toggle/swing logic as useFeed.applyVote, operating on this single post instead of a
   // list entry.
@@ -113,9 +157,8 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
     });
   }, []);
 
-  // Simplest correct option: post, then refetch the whole tree — constructing a locally-shaped
-  // CommentNode by hand (right author username, ranks, nesting position) isn't worth it for a feature
-  // whose comment counts are small by design (see F3's plan).
+  // Simplest correct option: post, then refetch the whole first page — constructing a locally-shaped
+  // CommentNode by hand (right author username, ranks, nesting position) isn't worth it here.
   const submitComment = useCallback(
     async (parentId: string | null, body: string) => {
       await postComment(postId, parentId, body);
@@ -124,5 +167,44 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
     [postId, load],
   );
 
-  return { post, comments, loading, error, applyPostVote, applyCommentVote, submitComment };
+  // GET /api/morechildren (feature 8) — the "N more replies" affordance. Reads the target node's own
+  // server-computed repliesAfter cursor (never constructed client-side), fetches the next page of its
+  // direct children, and appends them plus the new continuation cursor onto that same node.
+  const loadMoreReplies = useCallback(
+    (parentId: string) => {
+      const node = findNode(comments, parentId);
+      if (!node || node.repliesAfter == null) return;
+      const cursor = node.repliesAfter;
+      (async () => {
+        try {
+          const listing = await fetchMoreChildren(postId, parentId, sort, cursor);
+          const newChildren = await mergeMyVotes(listing.data.children.map((c) => c.data));
+          setComments((prev) =>
+            updateNode(prev, parentId, (n) => ({
+              ...n,
+              replies: [...n.replies, ...newChildren],
+              repliesAfter: listing.data.after,
+            })),
+          );
+        } catch {
+          setError('Could not load more replies.');
+        }
+      })();
+    },
+    [comments, postId, sort, mergeMyVotes],
+  );
+
+  return {
+    post,
+    comments,
+    loading,
+    error,
+    hasMoreComments: after !== null,
+    loadingMoreComments,
+    loadMoreComments,
+    applyPostVote,
+    applyCommentVote,
+    submitComment,
+    loadMoreReplies,
+  };
 }

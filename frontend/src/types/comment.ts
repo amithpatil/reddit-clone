@@ -16,6 +16,10 @@ export interface CommentNode {
   removed: boolean;
   createdAt: string;
   replies: CommentNode[];
+  // Non-null exactly when this node's own direct children were truncated (childCount exceeds
+  // replies.length) — an opaque cursor already positioned right after the last included child, ready to
+  // pass straight through to fetchMoreChildren's `after` param. Never constructed client-side.
+  repliesAfter: string | null;
   // Never sent by the backend — merged in client-side from GET /api/vote/mine?targetType=comment,
   // same reasoning as Post.myVote (see types/post.ts).
   myVote?: 1 | -1;

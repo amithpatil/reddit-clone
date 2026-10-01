@@ -214,7 +214,7 @@ req POST /api/comment "{\"postId\":\"$FIRST_POST_ID\",\"body\":\"seed extra top-
 req POST /api/comment "{\"postId\":\"$FIRST_POST_ID\",\"body\":\"seed extra top-level B\"}" -H "Authorization: Bearer ${TOKENS[3]}"
 
 req GET "/r/$PAGI_COMM/comments/$FIRST_POST_ID" ""
-TOPLEVEL_COUNT=$(echo "$HTTP_BODY" | jq '.comments | length')
+TOPLEVEL_COUNT=$(echo "$HTTP_BODY" | jq '.comments.data.children | length')
 if [ "$TOPLEVEL_COUNT" = "3" ]; then
   record PASS "checkpoint 4d: GET comments returns only top-level (3), excludes the 10 nested replies" "returned=$TOPLEVEL_COUNT"
 else

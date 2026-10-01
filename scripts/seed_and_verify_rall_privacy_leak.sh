@@ -121,15 +121,18 @@ expect_status "member comments on the private post" "200" "$HTTP_STATUS" "-"
 PRIV_COMMENT_ID=$(echo "$HTTP_BODY" | jq -r .id)
 
 # This dev DB has accumulated thousands of posts across the whole testing history, some with real
-# score/rank from real votes. /top, /rising, /controversial only return the top 25 by rank — a brand-new,
-# never-voted post (score/risingRank/controversialRank all 0) would legitimately not make page 1 against
-# that much history, which would make Phase C's /top /rising /controversial checks fail for a reason that
-# has nothing to do with the privacy filter under test. Boost both seeded posts' rank columns directly
-# (ranking data, not content — both rows were created through the real submit endpoint above) so they're
-# guaranteed to win page 1 regardless of how much other data exists, the same spirit as this suite's
-# existing precedent of directly manipulating rank columns to make a check deterministic (see
-# seed_and_verify_phase2.sh's RankDecayJob simulation).
-psql_c "UPDATE posts SET score = 999999, rising_rank = 999999, controversial_rank = 999999 WHERE id IN ('$PUB_POST_ID', '$PRIV_POST_ID')" > /dev/null
+# score/rank from real votes. /hot, /top, /rising, /controversial only return the top 25 by rank — a
+# brand-new, never-voted post (score/hotRank/risingRank/controversialRank all low) would legitimately not
+# make page 1 against that much history, which would make Phase C's checks fail for a reason that has
+# nothing to do with the privacy filter under test. hot_rank specifically decays with time, so even a
+# boost that was sufficient when this script was first written can stop being enough hours later as the
+# shared dev DB keeps accumulating higher-ranked posts in the meantime — boost it alongside the others,
+# not just once at authoring time. Boost both seeded posts' rank columns directly (ranking data, not
+# content — both rows were created through the real submit endpoint above) so they're guaranteed to win
+# page 1 regardless of how much other data exists, the same spirit as this suite's existing precedent of
+# directly manipulating rank columns to make a check deterministic (see seed_and_verify_phase2.sh's
+# RankDecayJob simulation).
+psql_c "UPDATE posts SET score = 999999, hot_rank = 999999, rising_rank = 999999, controversial_rank = 999999 WHERE id IN ('$PUB_POST_ID', '$PRIV_POST_ID')" > /dev/null
 
 ################################################################################
 echo "=== Phase C: every /r/all/* sort excludes the private post for anonymous/outsider, includes it for member/owner ==="

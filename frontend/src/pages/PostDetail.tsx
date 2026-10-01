@@ -15,11 +15,19 @@ export function PostDetail() {
   const [searchParams] = useSearchParams();
   const sort = (searchParams.get('commentSort') as CommentSortType) || 'best';
 
-  const { post, comments, loading, error, applyPostVote, applyCommentVote, submitComment } = usePostDetail(
-    communityName,
-    postId,
-    sort,
-  );
+  const {
+    post,
+    comments,
+    loading,
+    error,
+    hasMoreComments,
+    loadingMoreComments,
+    loadMoreComments,
+    applyPostVote,
+    applyCommentVote,
+    submitComment,
+    loadMoreReplies,
+  } = usePostDetail(communityName, postId, sort);
 
   if (loading) {
     return <div className={styles.state}>Loading…</div>;
@@ -64,7 +72,20 @@ export function PostDetail() {
         {comments.length === 0 ? (
           <p>No comments yet. Be the first to share what you think!</p>
         ) : (
-          comments.map((c) => <CommentThread key={c.id} comment={c} onVote={applyCommentVote} onReply={submitComment} />)
+          comments.map((c) => (
+            <CommentThread
+              key={c.id}
+              comment={c}
+              onVote={applyCommentVote}
+              onReply={submitComment}
+              onLoadMoreReplies={loadMoreReplies}
+            />
+          ))
+        )}
+        {hasMoreComments && (
+          <button type="button" className={styles.loadMoreComments} disabled={loadingMoreComments} onClick={loadMoreComments}>
+            {loadingMoreComments ? 'Loading…' : 'Load more comments'}
+          </button>
         )}
       </div>
     </div>

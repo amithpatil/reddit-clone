@@ -132,11 +132,11 @@ echo "=== Phase C: sort=best (default) picks confidence over raw score ==="
 ################################################################################
 
 req GET "/r/$COMM/comments/$POST_ID?sort=best" ""
-BEST_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments[0].id')
+BEST_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[0].data.id')
 expect_eq "sort=best ranks the high-confidence comment first" "$HIGHCONF_ID" "$BEST_FIRST"
 
 req GET "/r/$COMM/comments/$POST_ID" ""
-DEFAULT_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments[0].id')
+DEFAULT_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[0].data.id')
 expect_eq "omitting sort entirely defaults to best too" "$HIGHCONF_ID" "$DEFAULT_FIRST"
 
 ################################################################################
@@ -144,7 +144,7 @@ echo "=== Phase D: sort=top picks raw score, disagreeing with best ==="
 ################################################################################
 
 req GET "/r/$COMM/comments/$POST_ID?sort=top" ""
-TOP_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments[0].id')
+TOP_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[0].data.id')
 if [ "$TOP_FIRST" != "$HIGHCONF_ID" ]; then
   record PASS "sort=top disagrees with sort=best's first-place pick" "top first=$TOP_FIRST"
 else
@@ -156,13 +156,13 @@ echo "=== Phase E: sort=new / sort=old bracket the zero-vote comment ==="
 ################################################################################
 
 req GET "/r/$COMM/comments/$POST_ID?sort=new" ""
-NEW_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments[0].id')
+NEW_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[0].data.id')
 expect_eq "sort=new ranks the just-created comment first" "$NEW_ID" "$NEW_FIRST"
 
 req GET "/r/$COMM/comments/$POST_ID?sort=old" ""
-OLD_LAST=$(echo "$HTTP_BODY" | jq -r '.comments[-1].id')
+OLD_LAST=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[-1].data.id')
 expect_eq "sort=old ranks the just-created comment last" "$NEW_ID" "$OLD_LAST"
-OLD_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments[0].id')
+OLD_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[0].data.id')
 expect_eq "sort=old ranks the first-ever comment first" "$HIGHSCORE_ID" "$OLD_FIRST"
 
 ################################################################################
@@ -170,7 +170,7 @@ echo "=== Phase F: sort=controversial picks the split-vote comment ==="
 ################################################################################
 
 req GET "/r/$COMM/comments/$POST_ID?sort=controversial" ""
-CONTROVERSIAL_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments[0].id')
+CONTROVERSIAL_FIRST=$(echo "$HTTP_BODY" | jq -r '.comments.data.children[0].data.id')
 expect_eq "sort=controversial ranks the split-vote comment first" "$CONTROVERSIAL_ID" "$CONTROVERSIAL_FIRST"
 
 ################################################################################
