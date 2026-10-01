@@ -28,6 +28,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
+import java.util.stream.Collectors;
 
 @Service
 public class CommunityService {
@@ -379,17 +380,32 @@ public class CommunityService {
         return byId;
     }
 
-    // Read by CommunityController.about only (F4's plan) — a no-op for an anonymous viewer. Deliberately
-    // not wired into browse/search (GET /r, /r/search): per-result viewer context there is F5's (community
-    // discovery) job, not this one's, though it can reuse this exact method when that phase comes.
+    // Single-community convenience wrapper around attachViewerContextBatch below — kept so call sites like
+    // CommunityController.about don't need to wrap a singleton list themselves.
     public void attachViewerContext(Community c, UUID viewerId) {
-        if (viewerId == null) {
+        attachViewerContextBatch(List.of(c), viewerId);
+    }
+
+    // Three batched IN-queries total, regardless of how many communities are in the list — a page of 25
+    // from GET /r or GET /r/search (F5) must not turn into up to 75 individual lookups, the same never-N+1
+    // principle as PostService.attachMedia/attachFlair/attachAuthorUsername. No-op for an anonymous viewer
+    // or an empty list.
+    public void attachViewerContextBatch(List<Community> communityList, UUID viewerId) {
+        if (viewerId == null || communityList.isEmpty()) {
             return;
         }
-        c.setIsMember(memberships.existsByUserIdAndCommunityId(viewerId, c.getId()));
-        c.setIsModerator(moderators.existsByCommunityIdAndUserId(c.getId(), viewerId));
-        joinRequests.findById(new CommunityJoinRequestId(c.getId(), viewerId))
-                .ifPresent(jr -> c.setJoinRequestStatus(jr.getStatus()));
+        Set<UUID> communityIds = communityList.stream().map(Community::getId).collect(Collectors.toSet());
+        Set<UUID> memberOf = memberships.findByUserIdAndCommunityIdIn(viewerId, communityIds).stream()
+                .map(Membership::getCommunityId).collect(Collectors.toSet());
+        Set<UUID> moderatorOf = moderators.findByUserIdAndCommunityIdIn(viewerId, communityIds).stream()
+                .map(CommunityModerator::getCommunityId).collect(Collectors.toSet());
+        Map<UUID, String> joinStatusByCommunity = joinRequests.findByUserIdAndCommunityIdIn(viewerId, communityIds).stream()
+                .collect(Collectors.toMap(CommunityJoinRequest::getCommunityId, CommunityJoinRequest::getStatus));
+        for (Community c : communityList) {
+            c.setIsMember(memberOf.contains(c.getId()));
+            c.setIsModerator(moderatorOf.contains(c.getId()));
+            c.setJoinRequestStatus(joinStatusByCommunity.get(c.getId()));
+        }
     }
 
     @Transactional

@@ -1,3 +1,4 @@
+import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { Logo } from './Logo';
@@ -6,10 +7,18 @@ import styles from './NavBar.module.css';
 export function NavBar() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const [query, setQuery] = useState('');
 
   const handleLogout = async () => {
     await logout();
     navigate('/');
+  };
+
+  // The only search capability that exists today is community search (GET /r/search) — sitewide post/user
+  // search is backend feature 7, still parked. This has been a disabled placeholder since F1.
+  const handleSearch = (e: FormEvent) => {
+    e.preventDefault();
+    navigate(query.trim() ? `/communities?q=${encodeURIComponent(query.trim())}` : '/communities');
   };
 
   return (
@@ -18,9 +27,15 @@ export function NavBar() {
         <Logo />
       </Link>
 
-      <div className={styles.search}>
-        <input className={styles.searchInput} type="search" placeholder="Search reddit" disabled />
-      </div>
+      <form className={styles.search} onSubmit={handleSearch}>
+        <input
+          className={styles.searchInput}
+          type="search"
+          placeholder="Search reddit"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </form>
 
       <div className={styles.actions}>
         {user ? (

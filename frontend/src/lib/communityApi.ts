@@ -1,6 +1,9 @@
 import { api } from './apiClient';
+import type { Listing } from '../types/listing';
 import type { Community, CommunityRule } from '../types/community';
 import type { Post } from '../types/post';
+
+export type CommunityBrowseSort = 'popular' | 'new';
 
 export function fetchCommunityAbout(name: string): Promise<Community> {
   return api.get(`/r/${name}/about`) as Promise<Community>;
@@ -24,4 +27,14 @@ export function leaveCommunity(name: string): Promise<unknown> {
 
 export function requestToJoin(name: string): Promise<unknown> {
   return api.post(`/r/${name}/join-requests`);
+}
+
+export function browseCommunities(sort: CommunityBrowseSort, after?: string | null): Promise<Listing<Community>> {
+  const params = new URLSearchParams({ sort });
+  if (after) params.set('after', after);
+  return api.get(`/r?${params.toString()}`) as Promise<Listing<Community>>;
+}
+
+export function searchCommunities(query: string): Promise<Community[]> {
+  return api.get(`/r/search?q=${encodeURIComponent(query)}`) as Promise<Community[]>;
 }

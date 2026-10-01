@@ -1,6 +1,7 @@
 import { Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
+import { CommunityDiscovery } from './pages/CommunityDiscovery';
 import { CommunityPage } from './pages/CommunityPage';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
@@ -24,6 +25,7 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/r/:communityName/comments/:postId" element={<PostDetail />} />
         <Route path="/r/:communityName" element={<CommunityPage />} />
+        <Route path="/communities" element={<CommunityDiscovery />} />
       </Route>
     </Routes>
   );

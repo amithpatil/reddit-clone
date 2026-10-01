@@ -74,15 +74,17 @@ public class CommunityController {
     // a community-name segment AND a trailing /search segment, this is /r/ followed by the single literal
     // segment "search".
     @GetMapping("/search")
-    public List<Community> search(@RequestParam("q") String query) {
-        return communities.searchByName(query);
+    public List<Community> search(@AuthenticationPrincipal UUID viewerId, @RequestParam("q") String query) {
+        List<Community> results = communities.searchByName(query);
+        communities.attachViewerContextBatch(results, viewerId);
+        return results;
     }
 
     // sort=popular (default) keyed on subscriber_count, sort=new keyed on created_at — reuses
     // RankCursor/RankCursorCodec and Cursor/CursorCodec rather than inventing new pagination machinery,
     // the same two cursor shapes PostController's own multi-sort feeds already share.
     @GetMapping
-    public Listing<Community> browse(@RequestParam(required = false) String after,
+    public Listing<Community> browse(@AuthenticationPrincipal UUID viewerId, @RequestParam(required = false) String after,
                                       @RequestParam(name = "sort", required = false, defaultValue = "popular") String sort) {
         List<Community> page;
         String next;
@@ -98,6 +100,7 @@ public class CommunityController {
         } else {
             throw new BadRequestException("invalid sort");
         }
+        communities.attachViewerContextBatch(page, viewerId);
         List<Thing<Community>> children = page.stream().map(c -> new Thing<>(COMMUNITY_KIND, c)).toList();
         return Listing.of(children, next);
     }
