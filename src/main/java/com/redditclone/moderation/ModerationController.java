@@ -1,9 +1,12 @@
 package com.redditclone.moderation;
 
 import com.redditclone.community.AutomodRule;
+import com.redditclone.community.CommunityJoinRequest;
 import com.redditclone.community.CommunityModerator;
 import com.redditclone.community.CommunityService;
 import com.redditclone.community.Flair;
+import com.redditclone.community.dto.ApprovedSubmitterRequest;
+import com.redditclone.community.dto.SetCommunityTypeRequest;
 import com.redditclone.community.dto.SetFlairRequest;
 import com.redditclone.community.dto.SetRulesRequest;
 import com.redditclone.moderation.dto.AddModeratorRequest;
@@ -200,6 +203,39 @@ public class ModerationController {
         UUID communityId = communityId(name);
         communityService.requirePermission(userId, communityId, CommunityModerator.PERM_MANAGE_POSTS);
         postService.setLocked(postId, communityId, false);
+    }
+
+    // Owner-only — communityService.setType checks OWNER_PERMISSIONS internally (every bit set, which in
+    // practice means only the literal creator), not PERM_MANAGE_ACCESS below.
+    @PatchMapping("/r/{name}/mod/type")
+    public void setType(@AuthenticationPrincipal UUID userId, @PathVariable String name, @Valid @RequestBody SetCommunityTypeRequest req) {
+        communityService.setType(userId, communityId(name), req.type());
+    }
+
+    @GetMapping("/r/{name}/mod/join-requests")
+    public List<CommunityJoinRequest> listJoinRequests(@AuthenticationPrincipal UUID userId, @PathVariable String name) {
+        return communityService.listJoinRequests(userId, communityId(name));
+    }
+
+    @PostMapping("/r/{name}/mod/join-requests/{targetUserId}/approve")
+    public void approveJoinRequest(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID targetUserId) {
+        communityService.approveJoinRequest(userId, communityId(name), targetUserId);
+    }
+
+    @PostMapping("/r/{name}/mod/join-requests/{targetUserId}/deny")
+    public void denyJoinRequest(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID targetUserId) {
+        communityService.denyJoinRequest(userId, communityId(name), targetUserId);
+    }
+
+    @PostMapping("/r/{name}/mod/approved-submitters")
+    public void addApprovedSubmitter(@AuthenticationPrincipal UUID userId, @PathVariable String name,
+                                      @Valid @RequestBody ApprovedSubmitterRequest req) {
+        communityService.addApprovedSubmitter(userId, communityId(name), req.userId());
+    }
+
+    @DeleteMapping("/r/{name}/mod/approved-submitters/{targetUserId}")
+    public void removeApprovedSubmitter(@AuthenticationPrincipal UUID userId, @PathVariable String name, @PathVariable UUID targetUserId) {
+        communityService.removeApprovedSubmitter(userId, communityId(name), targetUserId);
     }
 
     private UUID communityId(String name) {

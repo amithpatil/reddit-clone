@@ -42,6 +42,8 @@ public class CommunityService {
     private final BanRepository bans;
     private final AutomodRuleRepository automodRules;
     private final FlairRepository flairs;
+    private final CommunityJoinRequestRepository joinRequests;
+    private final CommunityApprovedSubmitterRepository approvedSubmitters;
     private final UuidV7Generator ids;
     private final ObjectMapper json;
     private final ModerationAuditWriter auditWriter;
@@ -55,7 +57,9 @@ public class CommunityService {
 
     public CommunityService(CommunityRepository communities, MembershipRepository memberships,
                              CommunityModeratorRepository moderators, BanRepository bans,
-                             AutomodRuleRepository automodRules, FlairRepository flairs, UuidV7Generator ids,
+                             AutomodRuleRepository automodRules, FlairRepository flairs,
+                             CommunityJoinRequestRepository joinRequests,
+                             CommunityApprovedSubmitterRepository approvedSubmitters, UuidV7Generator ids,
                              ObjectMapper json, ModerationAuditWriter auditWriter, AuthService authService) {
         this.communities = communities;
         this.memberships = memberships;
@@ -63,6 +67,8 @@ public class CommunityService {
         this.bans = bans;
         this.automodRules = automodRules;
         this.flairs = flairs;
+        this.joinRequests = joinRequests;
+        this.approvedSubmitters = approvedSubmitters;
         this.ids = ids;
         this.json = json;
         this.auditWriter = auditWriter;
@@ -70,7 +76,7 @@ public class CommunityService {
     }
 
     @Transactional
-    public Community create(UUID creatorId, String name, String description) {
+    public Community create(UUID creatorId, String name, String description, String type) {
         if (communities.existsByName(name)) {
             throw new ConflictException("community name in use");
         }
@@ -78,6 +84,7 @@ public class CommunityService {
         c.setId(ids.nextId());
         c.setName(name);
         c.setDescription(description);
+        c.setType(type == null ? "public" : type);
         c.setCreatorId(creatorId);
         c.setSubscriberCount(1); // creator auto-joins as the first member
         communities.save(c);
@@ -95,6 +102,16 @@ public class CommunityService {
 
     @Transactional
     public void join(UUID userId, UUID communityId) {
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        if ("private".equals(c.getType())) {
+            throw new ForbiddenException("this community is private — request access instead");
+        }
+        addMemberDirectly(userId, communityId);
+    }
+
+    // Shared by join() (public/restricted self-serve) and approveJoinRequest() (private's approval path,
+    // which deliberately bypasses join()'s own private-community rejection since approval IS the path in).
+    private void addMemberDirectly(UUID userId, UUID communityId) {
         if (memberships.existsByUserIdAndCommunityId(userId, communityId)) {
             return; // idempotent
         }
@@ -387,5 +404,116 @@ public class CommunityService {
         Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
         c.setRules(json.writeValueAsString(rules));
         communities.save(c);
+    }
+
+    // ==================== Access control (restricted/private) ====================
+
+    // Only the literal owner by default — requirePermission's (permissions & bit) == bit check only ever
+    // matches OWNER_PERMISSIONS (every bit set) for whoever holds every single bit, which in practice
+    // means the creator, not a regular moderator granted a subset of permissions. No new permission-
+    // checking logic needed; this just calls the existing helper with that specific bit.
+    @Transactional
+    public void setType(UUID actorId, UUID communityId, String type) {
+        requirePermission(actorId, communityId, CommunityModerator.OWNER_PERMISSIONS);
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        c.setType(type);
+        communities.save(c);
+        // Deliberately does NOT touch existing Membership rows — a community flipping to private keeps
+        // its current subscribers viewing it with no new request needed; only new members need approval.
+    }
+
+    // No-ops for public/restricted. For private, passes for a member or any kind of moderator; a null
+    // viewerId (unauthenticated) always fails here, which is exactly the behavior every call site needs.
+    public void requireViewAccess(UUID viewerId, UUID communityId) {
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        if (!"private".equals(c.getType())) {
+            return;
+        }
+        if (viewerId != null && (memberships.existsByUserIdAndCommunityId(viewerId, communityId)
+                || moderators.existsByCommunityIdAndUserId(communityId, viewerId))) {
+            return;
+        }
+        throw new ForbiddenException("this community is private");
+    }
+
+    // No-op for public. Restricted requires a moderator or an approved submitter. Private requires a
+    // moderator or membership — the same check requireViewAccess does, since an approved private member
+    // already has posting rights with no separate "approved submitter" concept layered on top.
+    public void requirePostAccess(UUID authorId, UUID communityId) {
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        if (moderators.existsByCommunityIdAndUserId(communityId, authorId)) {
+            return;
+        }
+        switch (c.getType()) {
+            case "restricted" -> {
+                if (!approvedSubmitters.existsByCommunityIdAndUserId(communityId, authorId)) {
+                    throw new ForbiddenException("only approved submitters can post in this community");
+                }
+            }
+            case "private" -> {
+                if (!memberships.existsByUserIdAndCommunityId(authorId, communityId)) {
+                    throw new ForbiddenException("you must be an approved member of this private community to post");
+                }
+            }
+            default -> { } // public: no restriction
+        }
+    }
+
+    // 400s if the community isn't private — request-to-join only makes sense there; public/restricted use
+    // the ordinary subscribe endpoint. Always resets cleanly to "pending" regardless of any prior state
+    // (denied, or a stale approved row left over from having left and come back) rather than special-
+    // casing each one — simpler and avoids edge-case bugs from stale state.
+    @Transactional
+    public void requestToJoin(UUID userId, UUID communityId) {
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        if (!"private".equals(c.getType())) {
+            throw new BadRequestException("this community is not private — use the normal subscribe endpoint");
+        }
+        if (memberships.existsByUserIdAndCommunityId(userId, communityId)) {
+            return; // already a member, idempotent no-op
+        }
+        joinRequests.save(new CommunityJoinRequest(communityId, userId, "pending"));
+    }
+
+    public List<CommunityJoinRequest> listJoinRequests(UUID actorId, UUID communityId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_ACCESS);
+        return joinRequests.findByCommunityIdAndStatus(communityId, "pending");
+    }
+
+    @Transactional
+    public void approveJoinRequest(UUID actorId, UUID communityId, UUID targetUserId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_ACCESS);
+        CommunityJoinRequest r = joinRequests.findById(new CommunityJoinRequestId(communityId, targetUserId))
+                .orElseThrow(() -> new NotFoundException("no such join request"));
+        r.setStatus("approved");
+        r.setDecidedBy(actorId);
+        r.setDecidedAt(Instant.now());
+        joinRequests.save(r);
+        addMemberDirectly(targetUserId, communityId);
+    }
+
+    @Transactional
+    public void denyJoinRequest(UUID actorId, UUID communityId, UUID targetUserId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_ACCESS);
+        CommunityJoinRequest r = joinRequests.findById(new CommunityJoinRequestId(communityId, targetUserId))
+                .orElseThrow(() -> new NotFoundException("no such join request"));
+        r.setStatus("denied");
+        r.setDecidedBy(actorId);
+        r.setDecidedAt(Instant.now());
+        joinRequests.save(r);
+    }
+
+    @Transactional
+    public void addApprovedSubmitter(UUID actorId, UUID communityId, UUID targetUserId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_ACCESS);
+        if (!approvedSubmitters.existsByCommunityIdAndUserId(communityId, targetUserId)) {
+            approvedSubmitters.save(new CommunityApprovedSubmitter(communityId, targetUserId, actorId));
+        }
+    }
+
+    @Transactional
+    public void removeApprovedSubmitter(UUID actorId, UUID communityId, UUID targetUserId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_ACCESS);
+        approvedSubmitters.deleteByCommunityIdAndUserId(communityId, targetUserId);
     }
 }

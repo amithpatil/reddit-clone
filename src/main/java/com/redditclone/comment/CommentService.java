@@ -71,6 +71,9 @@ public class CommentService {
         // 404s on a nonexistent/deleted post instead of creating an orphan; also gives us communityId
         // without a second lookup, for the ban/automod checks below.
         Post post = postService.findById(postId);
+        // Private gates commenting too (if you can't view it, you can't reply to it) — but restricted does
+        // not, it only gates posting, so this is intentionally requireViewAccess, not requirePostAccess.
+        communityService.requireViewAccess(authorId, post.getCommunityId());
         communityService.requireNotBanned(authorId, post.getCommunityId());
         if (post.isLocked()) {
             throw new ForbiddenException("this post is locked");

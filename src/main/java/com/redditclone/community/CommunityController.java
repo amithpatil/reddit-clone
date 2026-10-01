@@ -29,7 +29,7 @@ public class CommunityController {
 
     @PostMapping
     public Community create(@AuthenticationPrincipal UUID userId, @Valid @RequestBody CreateCommunityRequest req) {
-        return communities.create(userId, req.name(), req.description());
+        return communities.create(userId, req.name(), req.description(), req.type());
     }
 
     @PostMapping("/{name}/subscribe")
@@ -50,5 +50,10 @@ public class CommunityController {
     @GetMapping("/{name}/rules")
     public List<CommunityRule> rules(@PathVariable String name) {
         return communities.getRules(communities.findByName(name).getId());
+    }
+
+    @PostMapping("/{name}/join-requests")
+    public void requestToJoin(@AuthenticationPrincipal UUID userId, @PathVariable String name) {
+        communities.requestToJoin(userId, communities.findByName(name).getId());
     }
 }

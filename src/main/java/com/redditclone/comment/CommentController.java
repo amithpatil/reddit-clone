@@ -42,6 +42,7 @@ public class CommentController {
     public PostWithCommentsView getPostWithComments(@AuthenticationPrincipal UUID viewerId,
                                                       @PathVariable String communityName, @PathVariable UUID postId) {
         UUID communityId = communityService.findByName(communityName).getId();
+        communityService.requireViewAccess(viewerId, communityId);
         var post = postService.findByIdWithMedia(postId);
         // The URL's communityName must actually own this post, and a removed post is hidden here the
         // same way it's hidden from /new — otherwise the community segment is decorative and "removed"

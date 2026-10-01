@@ -63,6 +63,7 @@ public class PostController {
     public Listing<Post> listNew(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                   @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
+        communityService.requireViewAccess(viewerId, communityId);
         Cursor cursor = CursorCodec.decode(after);
         List<Post> page = postService.findNewPage(communityId, cursor.createdAt(), cursor.id(), viewerId, PAGE_SIZE);
 
@@ -81,6 +82,13 @@ public class PostController {
     @GetMapping("/hot")
     public ResponseEntity<String> listHot(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                            @RequestParam(required = false) String after) {
+        // requireViewAccess runs before any cache read/write, not after: for a private community an
+        // anonymous (viewerId == null) request is always rejected here, before ever touching the cache —
+        // so a private community's /hot is never cached from an unapproved request, and an approved
+        // member's viewerId != null already bypasses the cache under the existing hidden-items rule below.
+        // No new caching-leak path is introduced by adding this check at this exact position.
+        UUID communityId = communityService.findByName(communityName).getId();
+        communityService.requireViewAccess(viewerId, communityId);
         boolean firstPage = after == null || after.isBlank();
         if (firstPage && viewerId == null) {
             Optional<String> cached = feedCache.getHotPage(communityName);
@@ -88,7 +96,6 @@ public class PostController {
                 return jsonResponse(cached.get());
             }
         }
-        UUID communityId = communityService.findByName(communityName).getId();
         RankCursor cursor = RankCursorCodec.decode(after, "hot");
         List<Post> page = postService.findHotPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         Listing<Post> listing = rankListing("hot", page, Post::getHotRank, null);
@@ -126,8 +133,10 @@ public class PostController {
 
     // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key, see PostService.search.
     @GetMapping("/search")
-    public Listing<Post> search(@PathVariable String communityName, @RequestParam("q") String query) {
+    public Listing<Post> search(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
+                                 @RequestParam("q") String query) {
         UUID communityId = communityService.findByName(communityName).getId();
+        communityService.requireViewAccess(viewerId, communityId);
         List<Post> results = postService.search(communityId, query);
         List<Thing<Post>> children = results.stream().map(p -> new Thing<>(POST_KIND, p)).toList();
         return Listing.of(children, null);
@@ -142,6 +151,7 @@ public class PostController {
                                   @RequestParam(required = false) String after,
                                   @RequestParam(name = "t", required = false, defaultValue = "all") String period) {
         UUID communityId = communityService.findByName(communityName).getId();
+        communityService.requireViewAccess(viewerId, communityId);
         RankCursor cursor = RankCursorCodec.decode(after, "top");
         Instant anchor = cursor.anchorEpochSecond() != null
                 ? Instant.ofEpochSecond(cursor.anchorEpochSecond())
@@ -155,6 +165,7 @@ public class PostController {
     public Listing<Post> listRising(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                      @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
+        communityService.requireViewAccess(viewerId, communityId);
         RankCursor cursor = RankCursorCodec.decode(after, "rising");
         List<Post> page = postService.findRisingPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         return rankListing("rising", page, Post::getRisingRank, null);
@@ -164,6 +175,7 @@ public class PostController {
     public Listing<Post> listControversial(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                             @RequestParam(required = false) String after) {
         UUID communityId = communityService.findByName(communityName).getId();
+        communityService.requireViewAccess(viewerId, communityId);
         RankCursor cursor = RankCursorCodec.decode(after, "controversial");
         List<Post> page = postService.findControversialPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         return rankListing("controversial", page, Post::getControversialRank, null);

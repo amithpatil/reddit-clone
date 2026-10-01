@@ -76,6 +76,7 @@ public class PostService {
         }
         try {
             communityService.requireNotBanned(authorId, communityId);
+            communityService.requirePostAccess(authorId, communityId);
             // Never trust a client-supplied mediaId without checking it resolves to something real, owned
             // by the caller, and actually usable — same principle already applied to vote targets. Runs
             // whenever mediaId is present, regardless of kind (a text/link post with a mediaId is exactly
