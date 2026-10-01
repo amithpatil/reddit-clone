@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -35,6 +36,16 @@ public class ModQueueEntry {
     @Column(name = "first_reported_at", nullable = false)
     private Instant firstReportedAt;
 
+    // Populated by ModerationService.listModQueue (F8) via a batched Post/Comment lookup split by
+    // targetType — a bare targetId tells a moderator nothing about what was actually reported. preview is
+    // the post's title, or a comment's body truncated to a fixed length; null if the target has since been
+    // deleted/removed out from under the queue entry.
+    @Transient
+    private String preview;
+
+    @Transient
+    private String authorUsername;
+
     public UUID getCommunityId() {
         return communityId;
     }
@@ -53,5 +64,21 @@ public class ModQueueEntry {
 
     public Instant getFirstReportedAt() {
         return firstReportedAt;
+    }
+
+    public String getPreview() {
+        return preview;
+    }
+
+    public void setPreview(String preview) {
+        this.preview = preview;
+    }
+
+    public String getAuthorUsername() {
+        return authorUsername;
+    }
+
+    public void setAuthorUsername(String authorUsername) {
+        this.authorUsername = authorUsername;
     }
 }

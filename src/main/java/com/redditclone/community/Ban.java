@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -35,6 +36,14 @@ public class Ban {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    // Populated by CommunityService.listBans (F8) — same display-attach convention as Post.authorUsername,
+    // batched via AuthService.findUsernamesByIds, never one lookup per ban.
+    @Transient
+    private String username;
+
+    @Transient
+    private String issuerUsername;
 
     public Ban() {
     }
@@ -75,5 +84,21 @@ public class Ban {
     // merge would otherwise overwrite created_at with the new instance's Instant.now() default).
     public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
+
+    public String getIssuerUsername() {
+        return issuerUsername;
+    }
+
+    public void setIssuerUsername(String issuerUsername) {
+        this.issuerUsername = issuerUsername;
     }
 }

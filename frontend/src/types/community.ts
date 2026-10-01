@@ -13,6 +13,10 @@ export interface Community {
   isMember?: boolean | null;
   isModerator?: boolean | null;
   joinRequestStatus?: 'pending' | 'approved' | 'denied' | null;
+  // The viewer's own CommunityModerator.permissions bitmask (F8) — null for a non-moderator/anonymous
+  // viewer (0 would be ambiguous with "a moderator granted zero bits"), real bits otherwise. See
+  // lib/moderationApi.ts's PERM_* constants for what each bit means.
+  myPermissions?: number | null;
 }
 
 export interface CommunityRule {

@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom';
 import type { Community, CommunityRule } from '../types/community';
 import { JoinButton } from './JoinButton';
 import styles from './CommunitySidebar.module.css';
@@ -21,6 +22,11 @@ export function CommunitySidebar({ community, rules, actionError, onJoin, onLeav
           r/{community.name}
           {community.isModerator && <span className={styles.modBadge}>Mod</span>}
         </h2>
+        {community.isModerator && (
+          <Link to={`/r/${community.name}/mod`} className={styles.modToolsLink}>
+            Mod Tools
+          </Link>
+        )}
       </div>
       {community.description && <p className={styles.description}>{community.description}</p>}
       <div className={styles.stats}>

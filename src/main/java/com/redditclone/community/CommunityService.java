@@ -17,6 +17,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -165,6 +166,29 @@ public class CommunityService {
         requirePermission(issuerId, communityId, CommunityModerator.PERM_BAN_USERS);
         bans.deleteById(new BanId(communityId, targetUserId));
         auditWriter.logAction(communityId, issuerId, "unban", "user", targetUserId, reason);
+    }
+
+    private static final int LIST_PAGE_SIZE = 100;
+
+    // F8's Bans tab (first-ever consumer — until now a moderator could issue/lift a ban but never see the
+    // current list). Same permission as issuing/lifting, and the same batched-username-attach convention
+    // as every other listing in this codebase.
+    public List<Ban> listBans(UUID actorId, UUID communityId) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_BAN_USERS);
+        List<Ban> banList = bans.findByCommunityIdOrderByCreatedAtDesc(communityId, Pageable.ofSize(LIST_PAGE_SIZE));
+        if (banList.isEmpty()) {
+            return banList;
+        }
+        Set<UUID> userIds = banList.stream().map(Ban::getUserId).collect(Collectors.toSet());
+        Set<UUID> issuerIds = banList.stream().map(Ban::getIssuerId).collect(Collectors.toSet());
+        Set<UUID> allIds = new HashSet<>(userIds);
+        allIds.addAll(issuerIds);
+        Map<UUID, String> usernames = authService.findUsernamesByIds(allIds);
+        banList.forEach(b -> {
+            b.setUsername(usernames.get(b.getUserId()));
+            b.setIssuerUsername(usernames.get(b.getIssuerId()));
+        });
+        return banList;
     }
 
     // ==================== Moderation: permissions ====================
@@ -397,14 +421,17 @@ public class CommunityService {
         Set<UUID> communityIds = communityList.stream().map(Community::getId).collect(Collectors.toSet());
         Set<UUID> memberOf = memberships.findByUserIdAndCommunityIdIn(viewerId, communityIds).stream()
                 .map(Membership::getCommunityId).collect(Collectors.toSet());
-        Set<UUID> moderatorOf = moderators.findByUserIdAndCommunityIdIn(viewerId, communityIds).stream()
-                .map(CommunityModerator::getCommunityId).collect(Collectors.toSet());
+        List<CommunityModerator> moderatorRows = moderators.findByUserIdAndCommunityIdIn(viewerId, communityIds);
+        Set<UUID> moderatorOf = moderatorRows.stream().map(CommunityModerator::getCommunityId).collect(Collectors.toSet());
+        Map<UUID, Integer> permissionsByCommunity = moderatorRows.stream()
+                .collect(Collectors.toMap(CommunityModerator::getCommunityId, CommunityModerator::getPermissions));
         Map<UUID, String> joinStatusByCommunity = joinRequests.findByUserIdAndCommunityIdIn(viewerId, communityIds).stream()
                 .collect(Collectors.toMap(CommunityJoinRequest::getCommunityId, CommunityJoinRequest::getStatus));
         for (Community c : communityList) {
             c.setIsMember(memberOf.contains(c.getId()));
             c.setIsModerator(moderatorOf.contains(c.getId()));
             c.setJoinRequestStatus(joinStatusByCommunity.get(c.getId()));
+            c.setMyPermissions(permissionsByCommunity.get(c.getId()));
         }
     }
 
@@ -520,7 +547,14 @@ public class CommunityService {
 
     public List<CommunityJoinRequest> listJoinRequests(UUID actorId, UUID communityId) {
         requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_ACCESS);
-        return joinRequests.findByCommunityIdAndStatus(communityId, "pending");
+        List<CommunityJoinRequest> requests = joinRequests.findByCommunityIdAndStatus(communityId, "pending");
+        if (requests.isEmpty()) {
+            return requests;
+        }
+        Map<UUID, String> usernames = authService.findUsernamesByIds(
+                requests.stream().map(CommunityJoinRequest::getUserId).collect(Collectors.toSet()));
+        requests.forEach(r -> r.setUsername(usernames.get(r.getUserId())));
+        return requests;
     }
 
     @Transactional

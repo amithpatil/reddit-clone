@@ -255,6 +255,13 @@ public class CommentService {
         return comments.findById(commentId).orElseThrow(() -> new NotFoundException("comment not found"));
     }
 
+    // Batched, no tree/display attach — same "internal lookup, not a display path" reasoning as
+    // post.PostService.findAllByIds (added in F7 for the identical purpose: ModerationService's mod queue,
+    // F8, batch-resolving a page's comment-type targets to a preview in one query instead of one per row).
+    public List<Comment> findAllByIds(Set<UUID> ids) {
+        return comments.findAllById(ids);
+    }
+
     // A user's "comments" profile tab (F7). Attaches postTitle/communityName in two batched queries (one
     // per page, never one per comment): postService.findAllByIds for the page's distinct post ids, then
     // communityService.findNamesByIds for those posts' distinct community ids — the same two-hop batching

@@ -4,6 +4,9 @@ import type { Post } from '../types/post';
 import type { UserComment } from '../types/comment';
 
 export interface PublicProfile {
+  // F8: lets the moderation dashboard resolve a username typed into a ban form to the id POST /mod/ban
+  // actually needs, via this same already-public endpoint.
+  id: string;
   username: string;
   karmaPost: number;
   karmaComment: number;

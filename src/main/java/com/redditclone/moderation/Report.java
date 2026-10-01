@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -44,6 +45,11 @@ public class Report {
     @Id
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    // Populated by ModerationService.listReportsForTarget (F8) — same display-attach convention as
+    // Post.authorUsername, batched via AuthService.findUsernamesByIds, never one lookup per report.
+    @Transient
+    private String reporterUsername;
 
     public UUID getId() {
         return id;
@@ -111,5 +117,13 @@ public class Report {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getReporterUsername() {
+        return reporterUsername;
+    }
+
+    public void setReporterUsername(String reporterUsername) {
+        this.reporterUsername = reporterUsername;
     }
 }

@@ -1,0 +1,112 @@
+.form {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.formRow {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.select,
+.input {
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.select {
+  flex: 1;
+}
+
+.input {
+  width: 100%;
+  margin-bottom: var(--space-2);
+  box-sizing: border-box;
+}
+
+.submitButton {
+  height: 36px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.formError {
+  color: #ea0027;
+  font-size: 13px;
+  margin: var(--space-2) 0 0;
+}
+
+.state {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.badge {
+  display: inline-block;
+  text-transform: uppercase;
+  font-weight: 700;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  margin-right: var(--space-2);
+}
+
+.actionBadge {
+  font-size: 11px;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.config {
+  margin-top: var(--space-1);
+  font-size: 13px;
+  color: var(--color-text);
+}
+
+.deleteButton {
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}

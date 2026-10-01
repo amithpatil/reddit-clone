@@ -1,0 +1,82 @@
+.form {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.input {
+  flex: 1;
+  height: 36px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.submitButton {
+  height: 36px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.submitButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.formError {
+  color: #ea0027;
+  font-size: 13px;
+  margin: 0 0 var(--space-2);
+}
+
+.state {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-6);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-2);
+  font-size: 14px;
+}
+
+.reason {
+  color: var(--color-text-secondary);
+}
+
+.meta {
+  font-size: 12px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+}
+
+.unbanButton {
+  height: 28px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}

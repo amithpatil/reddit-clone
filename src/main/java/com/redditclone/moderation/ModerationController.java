@@ -1,6 +1,7 @@
 package com.redditclone.moderation;
 
 import com.redditclone.community.AutomodRule;
+import com.redditclone.community.Ban;
 import com.redditclone.community.CommunityJoinRequest;
 import com.redditclone.community.CommunityModerator;
 import com.redditclone.community.CommunityService;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.ObjectMapper;
@@ -77,11 +79,26 @@ public class ModerationController {
         moderation.resolveReport(userId, communityId(name), reportId, "dismissed");
     }
 
+    // The individual reports behind one mod/queue entry (F8) — the queue itself only ever returns an
+    // aggregate count, never report ids; this is what a dashboard calls when a moderator expands one entry.
+    @GetMapping("/r/{name}/mod/reports")
+    public List<Report> reportsForTarget(@AuthenticationPrincipal UUID userId, @PathVariable String name,
+                                          @RequestParam String targetType, @RequestParam UUID targetId) {
+        return moderation.listReportsForTarget(userId, communityId(name), targetType, targetId);
+    }
+
     @PostMapping("/r/{name}/mod/remove/{targetType}/{targetId}")
     public void remove(@AuthenticationPrincipal UUID userId, @PathVariable String name,
                         @PathVariable String targetType, @PathVariable UUID targetId,
                         @RequestBody(required = false) RemoveRequest req) {
         moderation.removeContent(userId, communityId(name), targetType, targetId, req == null ? null : req.reason());
+    }
+
+    // F8's Bans tab (first-ever consumer — until now a moderator could issue/lift a ban but never see the
+    // current list at all).
+    @GetMapping("/r/{name}/mod/bans")
+    public List<Ban> bans(@AuthenticationPrincipal UUID userId, @PathVariable String name) {
+        return communityService.listBans(userId, communityId(name));
     }
 
     @PostMapping("/r/{name}/mod/ban")

@@ -57,6 +57,14 @@ public class Community {
     @Transient
     private String joinRequestStatus;
 
+    // The viewer's own CommunityModerator.permissions bitmask (F8) — null (not 0) for a non-moderator or
+    // anonymous viewer, same "absence vs a real zero" distinction isMember/isModerator already use; 0 is a
+    // legitimate "moderator with no bits granted" value, distinct from "never computed". Lets the frontend
+    // show only the controls a capped-permission moderator can actually use, instead of every moderator
+    // seeing every control and discovering the gaps via 403s.
+    @Transient
+    private Integer myPermissions;
+
     public UUID getId() {
         return id;
     }
@@ -148,5 +156,13 @@ public class Community {
 
     public void setJoinRequestStatus(String joinRequestStatus) {
         this.joinRequestStatus = joinRequestStatus;
+    }
+
+    public Integer getMyPermissions() {
+        return myPermissions;
+    }
+
+    public void setMyPermissions(Integer myPermissions) {
+        this.myPermissions = myPermissions;
     }
 }

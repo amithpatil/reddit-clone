@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.IdClass;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -37,6 +38,11 @@ public class CommunityJoinRequest {
 
     @Column(name = "decided_at")
     private Instant decidedAt;
+
+    // Populated by CommunityService.listJoinRequests (F8) — same display-attach convention as
+    // Post.authorUsername, batched via AuthService.findUsernamesByIds.
+    @Transient
+    private String username;
 
     public CommunityJoinRequest() {
     }
@@ -85,5 +91,13 @@ public class CommunityJoinRequest {
 
     public void setDecidedAt(Instant decidedAt) {
         this.decidedAt = decidedAt;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
     }
 }

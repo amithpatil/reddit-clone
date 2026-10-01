@@ -1,5 +1,7 @@
 package com.redditclone.moderation;
 
+import com.redditclone.auth.AuthService;
+import com.redditclone.comment.Comment;
 import com.redditclone.comment.CommentService;
 import com.redditclone.common.ModerationAuditWriter;
 import com.redditclone.common.UuidV7Generator;
@@ -16,8 +18,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ModerationService {
@@ -29,6 +35,7 @@ public class ModerationService {
     private final CommunityService communityService;
     private final PostService postService;
     private final CommentService commentService;
+    private final AuthService authService;
     private final ReportRepository reports;
     private final ModQueueRepository modQueue;
     private final ModerationActionRepository actions;
@@ -39,12 +46,14 @@ public class ModerationService {
     private final ModerationAuditWriter auditWriter;
 
     public ModerationService(CommunityService communityService, PostService postService, CommentService commentService,
-                              ReportRepository reports, ModQueueRepository modQueue, ModerationActionRepository actions,
-                              ModMailMessageRepository modMailMessages, ModMailMuteRepository modMailMutes,
-                              UuidV7Generator ids, JdbcTemplate jdbc, ModerationAuditWriter auditWriter) {
+                              AuthService authService, ReportRepository reports, ModQueueRepository modQueue,
+                              ModerationActionRepository actions, ModMailMessageRepository modMailMessages,
+                              ModMailMuteRepository modMailMutes, UuidV7Generator ids, JdbcTemplate jdbc,
+                              ModerationAuditWriter auditWriter) {
         this.communityService = communityService;
         this.postService = postService;
         this.commentService = commentService;
+        this.authService = authService;
         this.reports = reports;
         this.modQueue = modQueue;
         this.actions = actions;
@@ -101,9 +110,72 @@ public class ModerationService {
         deleteFromModQueue(communityId, report.getTargetType(), report.getTargetId());
     }
 
+    private static final int PREVIEW_LENGTH = 140;
+
     public List<ModQueueEntry> listModQueue(UUID actorId, UUID communityId) {
         communityService.requireAnyModPermission(actorId, communityId);
-        return modQueue.findByCommunityIdOrderByFirstReportedAtAsc(communityId, Pageable.ofSize(LIST_PAGE_SIZE));
+        List<ModQueueEntry> page = modQueue.findByCommunityIdOrderByFirstReportedAtAsc(communityId, Pageable.ofSize(LIST_PAGE_SIZE));
+        attachPreviews(page);
+        return page;
+    }
+
+    // A bare targetId tells a moderator nothing about what was actually reported — batches the page's
+    // post-type and comment-type targets into one lookup each (never one query per row), the same
+    // never-N+1 convention every listing in this codebase follows.
+    private void attachPreviews(List<ModQueueEntry> page) {
+        if (page.isEmpty()) {
+            return;
+        }
+        Set<UUID> postIds = new HashSet<>();
+        Set<UUID> commentIds = new HashSet<>();
+        for (ModQueueEntry entry : page) {
+            if ("post".equals(entry.getTargetType())) {
+                postIds.add(entry.getTargetId());
+            } else if ("comment".equals(entry.getTargetType())) {
+                commentIds.add(entry.getTargetId());
+            }
+        }
+        Map<UUID, Post> postsById = postService.findAllByIds(postIds).stream()
+                .collect(Collectors.toMap(Post::getId, p -> p));
+        Map<UUID, Comment> commentsById = commentService.findAllByIds(commentIds).stream()
+                .collect(Collectors.toMap(Comment::getId, c -> c));
+
+        Set<UUID> authorIds = new HashSet<>();
+        postsById.values().forEach(p -> authorIds.add(p.getAuthorId()));
+        commentsById.values().forEach(c -> authorIds.add(c.getAuthorId()));
+        Map<UUID, String> usernames = authService.findUsernamesByIds(authorIds);
+
+        for (ModQueueEntry entry : page) {
+            if ("post".equals(entry.getTargetType())) {
+                Post p = postsById.get(entry.getTargetId());
+                if (p != null) {
+                    entry.setPreview(p.getTitle());
+                    entry.setAuthorUsername(usernames.get(p.getAuthorId()));
+                }
+            } else if ("comment".equals(entry.getTargetType())) {
+                Comment c = commentsById.get(entry.getTargetId());
+                if (c != null) {
+                    String body = c.getBody();
+                    entry.setPreview(body != null && body.length() > PREVIEW_LENGTH
+                            ? body.substring(0, PREVIEW_LENGTH) + "…" : body);
+                    entry.setAuthorUsername(usernames.get(c.getAuthorId()));
+                }
+            }
+        }
+    }
+
+    // Resolves which individual reports sit behind one mod-queue entry (F8) — the queue itself only ever
+    // carries an aggregate count, never report ids, so there was previously no way for a moderator to
+    // discover a report id to resolve/dismiss unless they happened to file it themselves (see commit
+    // message). Same permission as resolving/dismissing, since viewing these only matters to act on them.
+    public List<Report> listReportsForTarget(UUID actorId, UUID communityId, String targetType, UUID targetId) {
+        communityService.requirePermission(actorId, communityId, CommunityModerator.PERM_REMOVE_CONTENT);
+        List<Report> reportList = reports.findByCommunityIdAndTargetTypeAndTargetIdOrderByCreatedAtDesc(
+                communityId, targetType, targetId);
+        Set<UUID> reporterIds = reportList.stream().map(Report::getReporterId).collect(Collectors.toSet());
+        Map<UUID, String> usernames = authService.findUsernamesByIds(reporterIds);
+        reportList.forEach(r -> r.setReporterUsername(usernames.get(r.getReporterId())));
+        return reportList;
     }
 
     public List<ModerationAction> listModerationActions(UUID actorId, UUID communityId) {
