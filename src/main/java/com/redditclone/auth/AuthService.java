@@ -15,7 +15,9 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -141,6 +143,16 @@ public class AuthService {
         }
         return users.findAllById(userIds).stream()
                 .collect(Collectors.toMap(User::getId, User::getUsername));
+    }
+
+    // Batched, order-preserving resolve of ids to User — read by follow.FollowService to turn a
+    // cursor-ordered page of Follow rows into the matching users (then PublicProfiles, with isFollowing
+    // attached) without a per-row lookup. findAllById doesn't guarantee result order, so this re-orders to
+    // match the caller's id order rather than returning whatever order the DB happens to hand back.
+    public List<User> findUsersByIds(List<UUID> orderedIds) {
+        Map<UUID, User> byId = users.findAllById(orderedIds).stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+        return orderedIds.stream().map(byId::get).filter(Objects::nonNull).toList();
     }
 
     // Read by community.CommunityService's permission checks so a deleted/banned account's still-valid
@@ -281,6 +293,19 @@ public class AuthService {
         if (delta != 0) {
             users.adjustKarmaComment(userId, delta);
         }
+    }
+
+    // Read by follow.FollowService.follow/unfollow — follow is a synchronous relationship toggle (unlike
+    // vote-driven karma, which batches through an async outbox worker), so these adjust the counter inline
+    // in the same request, same as CommunityService's incrementSubscriberCount/decrementSubscriberCount.
+    @Transactional
+    public void adjustFollowerCount(UUID userId, int delta) {
+        users.adjustFollowerCount(userId, delta);
+    }
+
+    @Transactional
+    public void adjustFollowingCount(UUID userId, int delta) {
+        users.adjustFollowingCount(userId, delta);
     }
 
     // Revokes only the family tied to this one refresh token ("log out of this device"), not every

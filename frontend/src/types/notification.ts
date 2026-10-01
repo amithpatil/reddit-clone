@@ -1,4 +1,4 @@
-export type NotificationType = 'post_reply' | 'reply' | 'mention' | 'chat_message';
+export type NotificationType = 'post_reply' | 'reply' | 'mention' | 'chat_message' | 'new_follower';
 
 // Flat/optional rather than a strict per-type union: the only consumer (NotificationsInbox) just reads
 // whichever fields a given type happens to carry, so a cast-free optional-fields shape is simpler than a

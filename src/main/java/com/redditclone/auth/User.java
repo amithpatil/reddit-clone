@@ -33,6 +33,12 @@ public class User {
     @Column(name = "karma_comment", nullable = false)
     private int karmaComment = 0;
 
+    @Column(name = "follower_count", nullable = false)
+    private int followerCount = 0;
+
+    @Column(name = "following_count", nullable = false)
+    private int followingCount = 0;
+
     @Column(name = "is_site_admin", nullable = false)
     private boolean siteAdmin = false;
 
@@ -93,6 +99,22 @@ public class User {
 
     public void setKarmaComment(int karmaComment) {
         this.karmaComment = karmaComment;
+    }
+
+    public int getFollowerCount() {
+        return followerCount;
+    }
+
+    public void setFollowerCount(int followerCount) {
+        this.followerCount = followerCount;
+    }
+
+    public int getFollowingCount() {
+        return followingCount;
+    }
+
+    public void setFollowingCount(int followingCount) {
+        this.followingCount = followingCount;
     }
 
     public boolean isSiteAdmin() {

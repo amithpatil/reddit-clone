@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+import { useMemo } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
+import { FollowButton } from '../components/FollowButton';
 import { PostCard } from '../components/PostCard';
 import { PostList } from '../components/PostList';
 import { ProfileCommentList } from '../components/ProfileCommentList';
 import { ProfileCommentRow } from '../components/ProfileCommentRow';
 import { useUserComments } from '../hooks/useUserComments';
 import { useUserPosts } from '../hooks/useUserPosts';
-import { ApiError } from '../lib/apiClient';
-import { fetchPublicProfile, type PublicProfile } from '../lib/userApi';
+import { useUserProfile } from '../hooks/useUserProfile';
 import styles from './UserProfile.module.css';
 
 type Tab = 'overview' | 'posts' | 'comments';
@@ -18,35 +19,14 @@ export function UserProfile() {
   const { username = '' } = useParams();
   const [searchParams, setSearchParams] = useSearchParams();
   const tab = (searchParams.get('tab') as Tab) || 'overview';
+  const { user: viewer } = useAuth();
 
-  const [profile, setProfile] = useState<PublicProfile | null>(null);
-  const [profileError, setProfileError] = useState<string | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const { profile, loading: profileLoading, error: profileError, actionError, follow, unfollow } = useUserProfile(username);
 
   // Both tabs' data load unconditionally on mount, not lazily per-tab — switching tabs is then instant
   // with no refetch, acceptable here since a profile page isn't a hot path the way the home feed is.
   const posts = useUserPosts(username);
   const comments = useUserComments(username);
-
-  useEffect(() => {
-    let cancelled = false;
-    setProfileLoading(true);
-    setProfileError(null);
-    (async () => {
-      try {
-        const p = await fetchPublicProfile(username);
-        if (!cancelled) setProfile(p);
-      } catch (err) {
-        if (cancelled) return;
-        setProfileError(err instanceof ApiError && err.status === 404 ? 'No such user.' : 'Could not load this profile.');
-      } finally {
-        if (!cancelled) setProfileLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [username]);
 
   const setTab = (next: Tab) => {
     const params = new URLSearchParams(searchParams);
@@ -85,8 +65,18 @@ export function UserProfile() {
         <div>
           <h1 className={styles.username}>u/{profile.username}</h1>
           <div className={styles.joined}>Joined {JOIN_DATE_FORMAT.format(new Date(profile.createdAt))}</div>
+          <FollowButton profile={profile} isOwnProfile={viewer?.username === profile.username} onFollow={follow} onUnfollow={unfollow} />
+          {actionError && <p className={styles.actionError}>{actionError}</p>}
         </div>
         <div className={styles.karma}>
+          <Link className={styles.karmaStat} to={`/user/${profile.username}/followers`}>
+            <span className={styles.karmaValue}>{profile.followerCount}</span>
+            <span className={styles.karmaLabel}>Followers</span>
+          </Link>
+          <Link className={styles.karmaStat} to={`/user/${profile.username}/following`}>
+            <span className={styles.karmaValue}>{profile.followingCount}</span>
+            <span className={styles.karmaLabel}>Following</span>
+          </Link>
           <div className={styles.karmaStat}>
             <span className={styles.karmaValue}>{profile.karmaPost}</span>
             <span className={styles.karmaLabel}>Post Karma</span>

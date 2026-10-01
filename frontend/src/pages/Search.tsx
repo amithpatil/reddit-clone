@@ -89,7 +89,9 @@ export function Search() {
             ) : users.users.length === 0 ? (
               <div className={styles.state}>No people found for "{query}".</div>
             ) : (
-              users.users.map((profile) => <UserResultCard key={profile.id} profile={profile} />)
+              users.users.map((profile) => (
+                <UserResultCard key={profile.id} profile={profile} onFollow={users.follow} onUnfollow={users.unfollow} />
+              ))
             )}
           </section>
         </>

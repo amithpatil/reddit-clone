@@ -8,6 +8,7 @@ const MUTE_TYPES: { type: NotificationType; label: string }[] = [
   { type: 'reply', label: 'Comment replies' },
   { type: 'mention', label: 'Mentions' },
   { type: 'chat_message', label: 'Chat messages' },
+  { type: 'new_follower', label: 'New followers' },
 ];
 
 // Shared by NotificationsInbox (F9) and the Settings page (F11) so the one checkbox list has one

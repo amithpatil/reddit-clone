@@ -26,12 +26,17 @@ public class UserController {
         return UserView.from(users.findById(userId).orElseThrow(() -> new NotFoundException("user not found")));
     }
 
+    // isFollowing is always null here — auth deliberately has no dependency on follow (every other module
+    // depends on auth, never the reverse; see ModuleBoundaryTest's cycle-freedom rule). A logged-in viewer's
+    // follow status for this profile is resolved by a separate call to follow.FollowController's
+    // GET /user/{username}/follow, authenticated-only so an anonymous caller never needs it.
     @GetMapping("/user/{username}/about")
     public PublicProfile about(@PathVariable String username) {
-        return PublicProfile.from(users.findByUsername(username)
-                .orElseThrow(() -> new NotFoundException("no such user")));
+        return PublicProfile.from(users.findByUsername(username).orElseThrow(() -> new NotFoundException("no such user")));
     }
 
+    // Same isFollowing-is-always-null reasoning as about() above — a logged-in viewer resolves follow
+    // status for a page of results via follow.FollowController's POST /user/follow-status.
     @GetMapping("/user/search")
     public List<PublicProfile> search(@RequestParam("q") String query) {
         return users.searchByUsername(query).stream().map(PublicProfile::from).toList();

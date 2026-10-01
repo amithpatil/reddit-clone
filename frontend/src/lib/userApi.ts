@@ -12,6 +12,14 @@ export interface PublicProfile {
   karmaComment: number;
   createdAt: string;
   status: 'active' | 'banned' | 'deleted';
+  followerCount: number;
+  followingCount: number;
+  // Always null straight off GET /user/{username}/about or GET /user/search — auth has no dependency on
+  // follow (see backend ModuleBoundaryTest), so those endpoints can never attach this themselves. A
+  // logged-in viewer's real value is merged in client-side from fetchFollowStatus/fetchFollowStatusBatch.
+  // GET /user/{username}/followers and /following are the one exception: those are owned by the follow
+  // module itself and already attach a real true/false there.
+  isFollowing: boolean | null;
 }
 
 export function fetchPublicProfile(username: string): Promise<PublicProfile> {
@@ -32,4 +40,33 @@ export function fetchUserPosts(username: string, after?: string | null): Promise
 export function fetchUserComments(username: string, after?: string | null): Promise<Listing<UserComment>> {
   const query = after ? `?after=${encodeURIComponent(after)}` : '';
   return api.get(`/user/${username}/comments${query}`) as Promise<Listing<UserComment>>;
+}
+
+export function followUser(username: string): Promise<unknown> {
+  return api.post(`/user/${username}/follow`);
+}
+
+export function unfollowUser(username: string): Promise<unknown> {
+  return api.del(`/user/${username}/follow`);
+}
+
+// Authenticated-only on the backend — only ever call this for a logged-in viewer.
+export function fetchFollowStatus(username: string): Promise<{ isFollowing: boolean }> {
+  return api.get(`/user/${username}/follow`) as Promise<{ isFollowing: boolean }>;
+}
+
+// Batch counterpart of fetchFollowStatus for a page of search/list results — one round trip regardless of
+// how many usernames are being checked. Authenticated-only on the backend, same as fetchFollowStatus.
+export function fetchFollowStatusBatch(usernames: string[]): Promise<Record<string, boolean>> {
+  return api.post('/user/follow-status', usernames) as Promise<Record<string, boolean>>;
+}
+
+export function fetchFollowers(username: string, after?: string | null): Promise<Listing<PublicProfile>> {
+  const query = after ? `?after=${encodeURIComponent(after)}` : '';
+  return api.get(`/user/${username}/followers${query}`) as Promise<Listing<PublicProfile>>;
+}
+
+export function fetchFollowing(username: string, after?: string | null): Promise<Listing<PublicProfile>> {
+  const query = after ? `?after=${encodeURIComponent(after)}` : '';
+  return api.get(`/user/${username}/following${query}`) as Promise<Listing<PublicProfile>>;
 }

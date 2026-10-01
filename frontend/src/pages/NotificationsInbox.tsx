@@ -22,6 +22,8 @@ function describe(n: NotificationItem): { text: string; href: string | null } {
       return { text: `u/${actor} mentioned you on "${postTitle}"`, href: postHref };
     case 'chat_message':
       return { text: `u/${actor} sent you a message`, href: null };
+    case 'new_follower':
+      return { text: `u/${actor} started following you`, href: n.actorUsername ? `/user/${actor}` : null };
     default:
       return { text: 'New notification', href: null };
   }

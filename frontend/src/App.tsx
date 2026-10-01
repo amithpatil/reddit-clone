@@ -15,6 +15,7 @@ import { PostSubmit } from './pages/PostSubmit';
 import { Register } from './pages/Register';
 import { Search } from './pages/Search';
 import { Settings } from './pages/Settings';
+import { UserConnections } from './pages/UserConnections';
 import { UserProfile } from './pages/UserProfile';
 
 function App() {
@@ -45,6 +46,8 @@ function App() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/submit" element={<PostSubmit />} />
         <Route path="/user/:username" element={<UserProfile />} />
+        <Route path="/user/:username/followers" element={<UserConnections mode="followers" />} />
+        <Route path="/user/:username/following" element={<UserConnections mode="following" />} />
       </Route>
     </Routes>
   );
