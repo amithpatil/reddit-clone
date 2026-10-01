@@ -71,8 +71,8 @@ public class PostService {
         Boolean claimed = redis.opsForValue().setIfAbsent(key, newId.toString(), Duration.ofHours(24));
         if (!Boolean.TRUE.equals(claimed)) {
             String existingPostId = redis.opsForValue().get(key);
-            return attachFlair(attachMedia(posts.findById(UUID.fromString(existingPostId))
-                    .orElseThrow(() -> new NotFoundException("post not found"))));
+            return attachAll(posts.findById(UUID.fromString(existingPostId))
+                    .orElseThrow(() -> new NotFoundException("post not found")));
         }
         try {
             communityService.requireNotBanned(authorId, communityId);
@@ -127,9 +127,9 @@ public class PostService {
                 // Reuse the row requireOwnedAndUsable already fetched instead of a second findAllById
                 // round trip a moment later via attachMedia() for a row that can't have changed since.
                 p.setMedia(mediaService.toMediaView(validatedMedia));
-                return p;
+                return attachCommunityName(attachAuthorUsername(p));
             }
-            return attachMedia(p);
+            return attachCommunityName(attachAuthorUsername(attachMedia(p)));
         } catch (RuntimeException e) {
             // The Redis claim above is outside this method's @Transactional boundary, so rolling back the
             // DB insert (e.g. on a ForbiddenException from requireNotBanned) doesn't undo it — release the
@@ -141,7 +141,15 @@ public class PostService {
     }
 
     public List<Post> findNewPage(UUID communityId, Instant cursorCreatedAt, UUID cursorId, UUID viewerId, int limit) {
-        return attachFlair(attachMedia(posts.findNewPage(communityId, cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit))));
+        return attachAll(posts.findNewPage(communityId, cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit)));
+    }
+
+    // Sitewide "r/all" counterpart — same query minus the communityId predicate (see PostRepository).
+    // PostController branches on communityName.equalsIgnoreCase("all") to call these instead of the
+    // per-community methods above; CommunityService.create() rejects a real community ever being named
+    // "all" so the two can never collide.
+    public List<Post> findNewAllPage(Instant cursorCreatedAt, UUID cursorId, UUID viewerId, int limit) {
+        return attachAll(posts.findNewAllPage(cursorCreatedAt, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
     // Deliberately does NOT attach media — used internally by other services (ban checks, comment-reply's
@@ -152,7 +160,7 @@ public class PostService {
     }
 
     public Post findByIdWithMedia(UUID postId) {
-        return attachFlair(attachMedia(findById(postId)));
+        return attachAll(findById(postId));
     }
 
     // For ModerationService's human-initiated removal path — Post already has a public `removed` setter
@@ -191,7 +199,7 @@ public class PostService {
     }
 
     public List<Post> findPinned(UUID communityId) {
-        return attachFlair(attachMedia(posts.findByCommunityIdAndPinnedTrueAndRemovedFalseOrderByCreatedAtDesc(communityId)));
+        return attachAll(posts.findByCommunityIdAndPinnedTrueAndRemovedFalseOrderByCreatedAtDesc(communityId));
     }
 
     // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key the way created_at/
@@ -203,7 +211,7 @@ public class PostService {
         }
         Map<UUID, Post> byId = new HashMap<>();
         posts.findAllById(rankedIds).forEach(p -> byId.put(p.getId(), p));
-        return attachFlair(attachMedia(rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList()));
+        return attachAll(rankedIds.stream().map(byId::get).filter(Objects::nonNull).toList());
     }
 
     public void incrementCommentCount(UUID postId) {
@@ -211,19 +219,35 @@ public class PostService {
     }
 
     public List<Post> findHotPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachFlair(attachMedia(posts.findHotPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
+        return attachAll(posts.findHotPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+    }
+
+    public List<Post> findHotAllPage(double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachAll(posts.findHotAllPage(cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
     public List<Post> findTopPage(UUID communityId, Instant since, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachFlair(attachMedia(posts.findTopPage(communityId, since, (int) cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
+        return attachAll(posts.findTopPage(communityId, since, (int) cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+    }
+
+    public List<Post> findTopAllPage(Instant since, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachAll(posts.findTopAllPage(since, (int) cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
     public List<Post> findRisingPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachFlair(attachMedia(posts.findRisingPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
+        return attachAll(posts.findRisingPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+    }
+
+    public List<Post> findRisingAllPage(double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachAll(posts.findRisingAllPage(cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
     public List<Post> findControversialPage(UUID communityId, double cursorRank, UUID cursorId, UUID viewerId, int limit) {
-        return attachFlair(attachMedia(posts.findControversialPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit))));
+        return attachAll(posts.findControversialPage(communityId, cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
+    }
+
+    public List<Post> findControversialAllPage(double cursorRank, UUID cursorId, UUID viewerId, int limit) {
+        return attachAll(posts.findControversialAllPage(cursorRank, cursorId, viewerId, Pageable.ofSize(limit)));
     }
 
     // Single batched IN query, never N+1 — called at the end of every page-returning method above (plus
@@ -280,6 +304,60 @@ public class PostService {
             p.setFlair(communityService.getFlairs(Set.of(p.getFlairId())).get(p.getFlairId()));
         }
         return p;
+    }
+
+    // Same batched-IN-query shape as attachMedia/attachFlair, via AuthService.findUsernamesByIds (already
+    // built for chat's room-summary rendering) — every post has an author, so no null-check gate needed
+    // the way media/flair's optional ids have.
+    private List<Post> attachAuthorUsername(List<Post> page) {
+        if (page.isEmpty()) {
+            return page;
+        }
+        Set<UUID> authorIds = new HashSet<>();
+        for (Post p : page) {
+            authorIds.add(p.getAuthorId());
+        }
+        Map<UUID, String> usernames = authService.findUsernamesByIds(authorIds);
+        for (Post p : page) {
+            p.setAuthorUsername(usernames.get(p.getAuthorId()));
+        }
+        return page;
+    }
+
+    private Post attachAuthorUsername(Post p) {
+        p.setAuthorUsername(authService.findUsernamesByIds(Set.of(p.getAuthorId())).get(p.getAuthorId()));
+        return p;
+    }
+
+    // Same shape again, via the new CommunityService.findNamesByIds — needed because a sitewide "r/all"
+    // page (see findNewAllPage et al.) mixes posts from many communities, so the route alone no longer
+    // tells the client which community each post belongs to the way a single-community feed's URL does.
+    private List<Post> attachCommunityName(List<Post> page) {
+        if (page.isEmpty()) {
+            return page;
+        }
+        Set<UUID> communityIds = new HashSet<>();
+        for (Post p : page) {
+            communityIds.add(p.getCommunityId());
+        }
+        Map<UUID, String> names = communityService.findNamesByIds(communityIds);
+        for (Post p : page) {
+            p.setCommunityName(names.get(p.getCommunityId()));
+        }
+        return page;
+    }
+
+    private Post attachCommunityName(Post p) {
+        p.setCommunityName(communityService.findNamesByIds(Set.of(p.getCommunityId())).get(p.getCommunityId()));
+        return p;
+    }
+
+    private List<Post> attachAll(List<Post> page) {
+        return attachCommunityName(attachAuthorUsername(attachFlair(attachMedia(page))));
+    }
+
+    private Post attachAll(Post p) {
+        return attachCommunityName(attachAuthorUsername(attachFlair(attachMedia(p))));
     }
 
     // ModerationController pushes the PERM_MANAGE_FLAIRS check down before calling this — no permission

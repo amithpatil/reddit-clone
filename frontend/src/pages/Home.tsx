@@ -1,15 +1,28 @@
-import { useAuth } from '../auth/AuthContext';
-import styles from './Home.module.css';
+import { useSearchParams } from 'react-router-dom';
+import { PostList } from '../components/PostList';
+import { SortTabs } from '../components/SortTabs';
+import { useFeed } from '../hooks/useFeed';
+import type { SortType, TopPeriod } from '../types/post';
 
-// Placeholder route for F1 — confirms the shell renders and auth state reflects correctly.
-// The real feed (sort tabs, post cards, voting) is F2's job.
 export function Home() {
-  const { user } = useAuth();
+  const [searchParams] = useSearchParams();
+  const sort = (searchParams.get('sort') as SortType) || 'hot';
+  const period = (searchParams.get('t') as TopPeriod) || 'all';
+
+  const { posts, loading, loadingMore, error, hasMore, loadMore, applyVote } = useFeed('all', sort, period);
 
   return (
-    <div className={styles.placeholder}>
-      <h1>{user ? `Welcome back, ${user.username}` : 'Welcome to reddit'}</h1>
-      <p>The home feed lands in F2. This page just proves the shell and auth session work.</p>
+    <div>
+      <SortTabs />
+      <PostList
+        posts={posts}
+        loading={loading}
+        loadingMore={loadingMore}
+        error={error}
+        hasMore={hasMore}
+        onLoadMore={loadMore}
+        onVote={applyVote}
+      />
     </div>
   );
 }

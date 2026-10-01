@@ -5,9 +5,14 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.UUID;
 
 public interface PostVoteRepository extends JpaRepository<PostVote, PostVoteId> {
+
+    // Read by VoteService.getMyPostVotes — a single batched IN query backing GET /api/vote/mine.
+    List<PostVote> findByUserIdAndPostIdIn(UUID userId, Collection<UUID> postIds);
 
     @Modifying
     @Query(value = """

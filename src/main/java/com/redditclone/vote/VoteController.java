@@ -5,12 +5,15 @@ import com.redditclone.vote.dto.VoteRequest;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -30,6 +33,18 @@ public class VoteController {
         } else {
             voteService.castCommentVote(userId, req.targetId(), req.dir());
         }
+    }
+
+    // Lets the frontend render correct vote-arrow state after a reload — the feed endpoints themselves
+    // can't carry this (see VoteService.getMyPostVotes for why). Scoped to targetType=post only for now;
+    // comment vote-state isn't needed until the comment-tree UI (F3) is built.
+    @GetMapping("/mine")
+    public Map<UUID, Short> myVotes(@AuthenticationPrincipal UUID userId, @RequestParam String targetType,
+                                     @RequestParam List<UUID> targetIds) {
+        if (!"post".equals(targetType)) {
+            throw new BadRequestException("targetType=comment is not yet supported");
+        }
+        return voteService.getMyPostVotes(userId, targetIds);
     }
 
     @DeleteMapping

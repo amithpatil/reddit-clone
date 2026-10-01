@@ -21,8 +21,18 @@ public class Post {
     @Column(name = "community_id", nullable = false)
     private UUID communityId;
 
+    // Populated by PostService.attachCommunityName(), same pattern/placement as media/flair below — a
+    // sitewide "r/all" listing mixes posts from many communities, so the route alone can't tell the
+    // client which one a given post belongs to the way a single-community feed's URL does.
+    @Transient
+    private String communityName;
+
     @Column(name = "author_id", nullable = false)
     private UUID authorId;
+
+    // Populated by PostService.attachAuthorUsername(), same pattern/placement as media/flair below.
+    @Transient
+    private String authorUsername;
 
     @Column(nullable = false)
     private String kind; // text | link | image | video
@@ -111,12 +121,28 @@ public class Post {
         this.communityId = communityId;
     }
 
+    public String getCommunityName() {
+        return communityName;
+    }
+
+    public void setCommunityName(String communityName) {
+        this.communityName = communityName;
+    }
+
     public UUID getAuthorId() {
         return authorId;
     }
 
     public void setAuthorId(UUID authorId) {
         this.authorId = authorId;
+    }
+
+    public String getAuthorUsername() {
+        return authorUsername;
+    }
+
+    public void setAuthorUsername(String authorUsername) {
+        this.authorUsername = authorUsername;
     }
 
     public String getKind() {

@@ -78,6 +78,11 @@ public class CommunityService {
 
     @Transactional
     public Community create(UUID creatorId, String name, String description, String type) {
+        // "all" is reserved as PostController's sitewide pseudo-community (/r/all/hot etc., see F2's
+        // plan) — a real community with this name would be indistinguishable from it.
+        if ("all".equalsIgnoreCase(name)) {
+            throw new ConflictException("community name is reserved");
+        }
         if (communities.existsByName(name)) {
             throw new ConflictException("community name in use");
         }
@@ -363,6 +368,14 @@ public class CommunityService {
     public Map<UUID, Flair> getFlairs(Set<UUID> flairIds) {
         Map<UUID, Flair> byId = new HashMap<>();
         flairs.findAllById(flairIds).forEach(f -> byId.put(f.getId(), f));
+        return byId;
+    }
+
+    // Same batched shape as getFlairs above — read by PostService.attachCommunityName so a sitewide
+    // "r/all" page (mixing posts from many communities) can still show which community each post is from.
+    public Map<UUID, String> findNamesByIds(Set<UUID> communityIds) {
+        Map<UUID, String> byId = new HashMap<>();
+        communities.findAllById(communityIds).forEach(c -> byId.put(c.getId(), c.getName()));
         return byId;
     }
 

@@ -9,8 +9,11 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Collection;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class VoteService {
@@ -77,6 +80,19 @@ public class VoteService {
                 .orElseThrow(() -> new NotFoundException("vote not found"));
         commentVotes.delete(existing);
         outbox.writeEvent("comment_vote_removed", new VoteEventPayload(commentId, (int) existing.getDirection(), null));
+    }
+
+    // Read by VoteController.myVotes so the frontend can render vote-arrow state correctly after a page
+    // reload. Deliberately NOT exposed through PostService/Post itself — vote already depends on post
+    // (castPostVote above calls postService.findById), so post depending back on vote to attach this would
+    // create a cycle ModuleBoundaryTest.modules_are_free_of_cycles forbids. A separate endpoint here, with
+    // the frontend composing the two responses client-side, keeps the one-directional boundary intact.
+    public Map<UUID, Short> getMyPostVotes(UUID userId, Collection<UUID> postIds) {
+        if (postIds.isEmpty()) {
+            return Map.of();
+        }
+        return postVotes.findByUserIdAndPostIdIn(userId, postIds).stream()
+                .collect(Collectors.toMap(PostVote::getPostId, PostVote::getDirection));
     }
 
     private void requireDirection(short direction) {

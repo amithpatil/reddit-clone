@@ -62,15 +62,28 @@ public class PostController {
     @GetMapping("/new")
     public Listing<Post> listNew(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                   @RequestParam(required = false) String after) {
-        UUID communityId = communityService.findByName(communityName).getId();
-        communityService.requireViewAccess(viewerId, communityId);
         Cursor cursor = CursorCodec.decode(after);
-        List<Post> page = postService.findNewPage(communityId, cursor.createdAt(), cursor.id(), viewerId, PAGE_SIZE);
+        List<Post> page;
+        if (isAllFeed(communityName)) {
+            page = postService.findNewAllPage(cursor.createdAt(), cursor.id(), viewerId, PAGE_SIZE);
+        } else {
+            UUID communityId = communityService.findByName(communityName).getId();
+            communityService.requireViewAccess(viewerId, communityId);
+            page = postService.findNewPage(communityId, cursor.createdAt(), cursor.id(), viewerId, PAGE_SIZE);
+        }
 
         List<Thing<Post>> children = page.stream().map(p -> new Thing<>(POST_KIND, p)).toList();
         String next = page.isEmpty() ? null
                 : CursorCodec.encode(page.getLast().getCreatedAt(), page.getLast().getId());
         return Listing.of(children, next);
+    }
+
+    // "all" is a reserved pseudo-community name (CommunityService.create rejects a real community ever
+    // using it) meaning "every community, sitewide" — reddit.com's own r/all convention. Routing it
+    // through the same /r/{communityName}/{sort} paths means the frontend's feed-fetching code needs zero
+    // special-casing between the home feed and a real community's feed (see F2's plan).
+    private boolean isAllFeed(String communityName) {
+        return "all".equalsIgnoreCase(communityName);
     }
 
     // Page 1 only (no `after`) is cache-eligible — see FeedCacheService. Uniformly returns a raw JSON
@@ -87,17 +100,26 @@ public class PostController {
         // so a private community's /hot is never cached from an unapproved request, and an approved
         // member's viewerId != null already bypasses the cache under the existing hidden-items rule below.
         // No new caching-leak path is introduced by adding this check at this exact position.
-        UUID communityId = communityService.findByName(communityName).getId();
-        communityService.requireViewAccess(viewerId, communityId);
+        boolean isAll = isAllFeed(communityName);
+        UUID communityId = null;
+        if (!isAll) {
+            communityId = communityService.findByName(communityName).getId();
+            communityService.requireViewAccess(viewerId, communityId);
+        }
         boolean firstPage = after == null || after.isBlank();
         if (firstPage && viewerId == null) {
+            // Keyed purely by the communityName string (FeedCacheService.key) — "all" gets its own cache
+            // entry (feed:hot:all) with zero changes to that service, matching real Reddit's own heavy
+            // caching of r/all and r/popular.
             Optional<String> cached = feedCache.getHotPage(communityName);
             if (cached.isPresent()) {
                 return jsonResponse(cached.get());
             }
         }
         RankCursor cursor = RankCursorCodec.decode(after, "hot");
-        List<Post> page = postService.findHotPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        List<Post> page = isAll
+                ? postService.findHotAllPage(cursor.rank(), cursor.id(), viewerId, PAGE_SIZE)
+                : postService.findHotPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
         Listing<Post> listing = rankListing("hot", page, Post::getHotRank, null);
         String body = json.writeValueAsString(listing);
         if (firstPage && viewerId == null) {
@@ -150,34 +172,49 @@ public class PostController {
     public Listing<Post> listTop(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                   @RequestParam(required = false) String after,
                                   @RequestParam(name = "t", required = false, defaultValue = "all") String period) {
-        UUID communityId = communityService.findByName(communityName).getId();
-        communityService.requireViewAccess(viewerId, communityId);
         RankCursor cursor = RankCursorCodec.decode(after, "top");
         Instant anchor = cursor.anchorEpochSecond() != null
                 ? Instant.ofEpochSecond(cursor.anchorEpochSecond())
                 : Instant.now();
         Instant since = periodCutoff(period, anchor);
-        List<Post> page = postService.findTopPage(communityId, since, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        List<Post> page;
+        if (isAllFeed(communityName)) {
+            page = postService.findTopAllPage(since, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        } else {
+            UUID communityId = communityService.findByName(communityName).getId();
+            communityService.requireViewAccess(viewerId, communityId);
+            page = postService.findTopPage(communityId, since, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        }
         return rankListing("top", page, p -> (double) p.getScore(), anchor.getEpochSecond());
     }
 
     @GetMapping("/rising")
     public Listing<Post> listRising(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                      @RequestParam(required = false) String after) {
-        UUID communityId = communityService.findByName(communityName).getId();
-        communityService.requireViewAccess(viewerId, communityId);
         RankCursor cursor = RankCursorCodec.decode(after, "rising");
-        List<Post> page = postService.findRisingPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        List<Post> page;
+        if (isAllFeed(communityName)) {
+            page = postService.findRisingAllPage(cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        } else {
+            UUID communityId = communityService.findByName(communityName).getId();
+            communityService.requireViewAccess(viewerId, communityId);
+            page = postService.findRisingPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        }
         return rankListing("rising", page, Post::getRisingRank, null);
     }
 
     @GetMapping("/controversial")
     public Listing<Post> listControversial(@AuthenticationPrincipal UUID viewerId, @PathVariable String communityName,
                                             @RequestParam(required = false) String after) {
-        UUID communityId = communityService.findByName(communityName).getId();
-        communityService.requireViewAccess(viewerId, communityId);
         RankCursor cursor = RankCursorCodec.decode(after, "controversial");
-        List<Post> page = postService.findControversialPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        List<Post> page;
+        if (isAllFeed(communityName)) {
+            page = postService.findControversialAllPage(cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        } else {
+            UUID communityId = communityService.findByName(communityName).getId();
+            communityService.requireViewAccess(viewerId, communityId);
+            page = postService.findControversialPage(communityId, cursor.rank(), cursor.id(), viewerId, PAGE_SIZE);
+        }
         return rankListing("controversial", page, Post::getControversialRank, null);
     }
 
