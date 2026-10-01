@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { ChatNavLink } from './ChatNavLink';
 import { CreateMenu } from './CreateMenu';
 import { Logo } from './Logo';
 import { NotificationBell } from './NotificationBell';
@@ -43,6 +44,7 @@ export function NavBar() {
         {user ? (
           <div className={styles.userMenu}>
             <CreateMenu />
+            <ChatNavLink />
             <NotificationBell />
             <Link to={`/user/${user.username}`} className={styles.profileLink}>
               <span className={styles.avatar}>{user.username.slice(0, 1)}</span>

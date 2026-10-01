@@ -1,6 +1,8 @@
 import { Route, Routes } from 'react-router-dom';
 import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
+import { ChatRoom } from './pages/ChatRoom';
+import { ChatRoomList } from './pages/ChatRoomList';
 import { CommunityDiscovery } from './pages/CommunityDiscovery';
 import { CommunityPage } from './pages/CommunityPage';
 import { CreateCommunity } from './pages/CreateCommunity';
@@ -26,6 +28,8 @@ function App() {
     <Routes>
       <Route element={<Layout />}>
         <Route path="/" element={<Home />} />
+        <Route path="/chat" element={<ChatRoomList />} />
+        <Route path="/chat/:roomId" element={<ChatRoom />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/r/:communityName/comments/:postId" element={<PostDetail />} />

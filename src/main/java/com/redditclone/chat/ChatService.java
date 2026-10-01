@@ -153,7 +153,23 @@ public class ChatService {
 
     public List<ChatMessage> history(UUID userId, UUID roomId, Instant cursorCreatedAt, UUID cursorId, int limit) {
         requireParticipant(userId, roomId);
-        return messages.findPage(roomId, cursorCreatedAt, cursorId, Pageable.ofSize(limit));
+        List<ChatMessage> page = messages.findPage(roomId, cursorCreatedAt, cursorId, Pageable.ofSize(limit));
+        attachSenderUsernames(page);
+        return page;
+    }
+
+    // Same @Transient attach-plus-batched-lookup pattern as PostService.attachAuthorUsername — a message
+    // only carries a bare senderId column, and a conversation (especially a group room) needs to know who
+    // said what without the client guessing from the room's otherParticipants list.
+    private void attachSenderUsernames(List<ChatMessage> page) {
+        if (page.isEmpty()) {
+            return;
+        }
+        Set<UUID> senderIds = page.stream().map(ChatMessage::getSenderId).collect(Collectors.toSet());
+        Map<UUID, String> usernames = authService.findUsernamesByIds(senderIds);
+        for (ChatMessage m : page) {
+            m.setSenderUsername(usernames.get(m.getSenderId()));
+        }
     }
 
     @Transactional
@@ -174,7 +190,11 @@ public class ChatService {
         m.setRoomId(roomId);
         m.setSenderId(senderId);
         m.setBody(sanitized);
-        return messages.save(m);
+        ChatMessage saved = messages.save(m);
+        // Same single-id-via-batched-call shape as PostService.attachAuthorUsername — resolved here, not
+        // in ChatStompHandler, so both the live-pushed message and a future REST send path get it for free.
+        saved.setSenderUsername(authService.findUsernamesByIds(Set.of(senderId)).get(senderId));
+        return saved;
     }
 
     @Transactional

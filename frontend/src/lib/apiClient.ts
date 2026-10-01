@@ -1,4 +1,6 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8081';
+// Exported so the chat STOMP client (ChatContext) can derive its ws(s):// broker URL from the same single
+// source of truth instead of duplicating the env var name and fallback literal in a second place.
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8081';
 
 export class ApiError extends Error {
   status: number;
@@ -20,6 +22,13 @@ let refreshAccessToken: RefreshFn = async () => null;
 export function configureApiClient(opts: { getAccessToken: TokenGetter; refresh: RefreshFn }) {
   getAccessToken = opts.getAccessToken;
   refreshAccessToken = opts.refresh;
+}
+
+// Exposed for the chat STOMP client (ChatContext), which needs the current bearer token to send as a
+// native STOMP header on every connect/reconnect — reuses this same closure rather than threading a
+// second copy of "the current token" through a separate context.
+export function getCurrentAccessToken(): string | null {
+  return getAccessToken();
 }
 
 async function parseBody(res: Response): Promise<unknown> {

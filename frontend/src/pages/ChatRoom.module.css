@@ -1,0 +1,149 @@
+.page {
+  max-width: 700px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--nav-height) - var(--space-5) * 2);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.back {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-link);
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.messages {
+  flex: 1;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.state {
+  text-align: center;
+  color: var(--color-text-secondary);
+  padding: var(--space-6);
+}
+
+.loadOlder {
+  align-self: center;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  padding: var(--space-1) var(--space-3);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-link);
+  cursor: pointer;
+  margin-bottom: var(--space-2);
+}
+
+.loadOlder:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.messageRow {
+  display: flex;
+}
+
+.own {
+  justify-content: flex-end;
+}
+
+.bubble {
+  max-width: 70%;
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3);
+}
+
+.own .bubble {
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.sender {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-link);
+  margin-bottom: 2px;
+}
+
+.body {
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.time {
+  font-size: 10px;
+  color: var(--color-text-secondary);
+  margin-top: 2px;
+  text-align: right;
+}
+
+.own .time {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.sendError {
+  font-size: 12px;
+  color: var(--color-danger);
+  margin-top: var(--space-2);
+}
+
+.compose {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.composeInput {
+  flex: 1;
+  resize: none;
+  min-height: 40px;
+  max-height: 120px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  font-size: 14px;
+  color: var(--color-text);
+}
+
+.sendButton {
+  height: 40px;
+  padding: 0 var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sendButton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

@@ -2,6 +2,7 @@ package com.redditclone.chat;
 
 import com.redditclone.auth.JwtService;
 import io.jsonwebtoken.JwtException;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -28,16 +29,22 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 public class ChatWebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
     private final JwtService jwtService;
+    private final String[] allowedOrigins;
 
-    public ChatWebSocketConfig(JwtService jwtService) {
+    public ChatWebSocketConfig(JwtService jwtService, @Value("${app.cors.allowed-origins}") String allowedOrigins) {
         this.jwtService = jwtService;
+        this.allowedOrigins = allowedOrigins.split(",");
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // No SockJS: no legacy-browser fallback requirement for this backend-only build; a real future
         // frontend would use the native WebSocket API directly.
-        registry.addEndpoint("/ws");
+        // setAllowedOrigins is required here, same as SecurityConfig's REST CorsConfigurationSource bean:
+        // without it, Spring applies its default same-origin policy to the handshake itself, which a
+        // frontend running on a different origin (the Vite dev server) can never pass — confirmed via a
+        // raw curl WebSocket-upgrade probe (Origin: http://localhost:5174 -> 403 before this fix).
+        registry.addEndpoint("/ws").setAllowedOrigins(allowedOrigins);
     }
 
     @Override
