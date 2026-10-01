@@ -1,5 +1,6 @@
 package com.redditclone.community;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -88,6 +89,11 @@ public class Community {
         this.subscriberCount = subscriberCount;
     }
 
+    // Hidden from any endpoint that serializes this entity directly (POST /r, GET /r/{name}/about) — this
+    // is the raw JSON-encoded string Hibernate maps the column to, and returning it as-is would double-
+    // encode (a string field containing already-JSON-encoded text instead of a real array). Structured
+    // access goes through CommunityService.getRules()/the dedicated GET /{name}/rules endpoint instead.
+    @JsonIgnore
     public String getRules() {
         return rules;
     }

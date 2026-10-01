@@ -9,6 +9,7 @@ import com.redditclone.common.exception.ConflictException;
 import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.community.dto.CommunityRule;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.JsonNode;
@@ -515,5 +516,23 @@ public class CommunityService {
     public void removeApprovedSubmitter(UUID actorId, UUID communityId, UUID targetUserId) {
         requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_ACCESS);
         approvedSubmitters.deleteByCommunityIdAndUserId(communityId, targetUserId);
+    }
+
+    // ==================== Discovery ====================
+
+    public List<Community> browseNew(Instant cursorCreatedAt, UUID cursorId, int limit) {
+        return communities.findNewPage(cursorCreatedAt, cursorId, Pageable.ofSize(limit));
+    }
+
+    // Takes a double and casts internally, same convention PostService.findTopPage already uses for its
+    // own rank cursor — RankCursor.FIRST_PAGE's Double.MAX_VALUE saturates to Integer.MAX_VALUE on the
+    // cast, still comfortably larger than any real subscriber_count, so the first page still matches
+    // every row correctly.
+    public List<Community> browsePopular(double cursorSubscriberCount, UUID cursorId, int limit) {
+        return communities.findPopularPage((int) cursorSubscriberCount, cursorId, Pageable.ofSize(limit));
+    }
+
+    public List<Community> searchByName(String query) {
+        return communities.searchByName(query);
     }
 }

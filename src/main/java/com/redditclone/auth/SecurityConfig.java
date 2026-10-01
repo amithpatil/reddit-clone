@@ -46,7 +46,7 @@ public class SecurityConfig {
                         // and populates the principal when a token IS present.
                         .requestMatchers(HttpMethod.GET, "/r/*/new", "/r/*/hot", "/r/*/top", "/r/*/rising",
                                 "/r/*/controversial", "/r/*/search", "/r/*/comments/*", "/user/*/about", "/r/*/flairs",
-                                "/r/*/pinned", "/r/*/rules")
+                                "/r/*/pinned", "/r/*/rules", "/r", "/r/search", "/r/*/about")
                         .permitAll()
                         .requestMatchers("/actuator/health").permitAll()
                         // The WebSocket handshake is a plain HTTP GET that a browser-native WebSocket

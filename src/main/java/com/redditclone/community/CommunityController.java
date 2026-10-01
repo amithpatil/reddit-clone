@@ -1,5 +1,12 @@
 package com.redditclone.community;
 
+import com.redditclone.common.exception.BadRequestException;
+import com.redditclone.common.paging.Cursor;
+import com.redditclone.common.paging.CursorCodec;
+import com.redditclone.common.paging.Listing;
+import com.redditclone.common.paging.RankCursor;
+import com.redditclone.common.paging.RankCursorCodec;
+import com.redditclone.common.paging.Thing;
 import com.redditclone.community.dto.CommunityRule;
 import com.redditclone.community.dto.CreateCommunityRequest;
 import com.redditclone.community.dto.SetFlairRequest;
@@ -12,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -20,6 +28,9 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/r")
 public class CommunityController {
+
+    private static final String COMMUNITY_KIND = "t5"; // Reddit's own kind code for a subreddit
+    private static final int PAGE_SIZE = 25;
 
     private final CommunityService communities;
 
@@ -55,5 +66,44 @@ public class CommunityController {
     @PostMapping("/{name}/join-requests")
     public void requestToJoin(@AuthenticationPrincipal UUID userId, @PathVariable String name) {
         communities.requestToJoin(userId, communities.findByName(name).getId());
+    }
+
+    // Public, every community regardless of type — existence/description/subscriber count are metadata,
+    // the same category GET /flairs/GET /rules/GET /pinned already treat as public even for private
+    // communities. No path collision with PostController's /r/{communityName}/search: that pattern needs
+    // a community-name segment AND a trailing /search segment, this is /r/ followed by the single literal
+    // segment "search".
+    @GetMapping("/search")
+    public List<Community> search(@RequestParam("q") String query) {
+        return communities.searchByName(query);
+    }
+
+    // sort=popular (default) keyed on subscriber_count, sort=new keyed on created_at — reuses
+    // RankCursor/RankCursorCodec and Cursor/CursorCodec rather than inventing new pagination machinery,
+    // the same two cursor shapes PostController's own multi-sort feeds already share.
+    @GetMapping
+    public Listing<Community> browse(@RequestParam(required = false) String after,
+                                      @RequestParam(name = "sort", required = false, defaultValue = "popular") String sort) {
+        List<Community> page;
+        String next;
+        if ("new".equals(sort)) {
+            Cursor cursor = CursorCodec.decode(after);
+            page = communities.browseNew(cursor.createdAt(), cursor.id(), PAGE_SIZE);
+            next = page.isEmpty() ? null : CursorCodec.encode(page.getLast().getCreatedAt(), page.getLast().getId());
+        } else if ("popular".equals(sort)) {
+            RankCursor cursor = RankCursorCodec.decode(after, "popular");
+            page = communities.browsePopular(cursor.rank(), cursor.id(), PAGE_SIZE);
+            next = page.isEmpty() ? null
+                    : RankCursorCodec.encode("popular", page.getLast().getSubscriberCount(), page.getLast().getId(), null);
+        } else {
+            throw new BadRequestException("invalid sort");
+        }
+        List<Thing<Community>> children = page.stream().map(c -> new Thing<>(COMMUNITY_KIND, c)).toList();
+        return Listing.of(children, next);
+    }
+
+    @GetMapping("/{name}/about")
+    public Community about(@PathVariable String name) {
+        return communities.findByName(name);
     }
 }
