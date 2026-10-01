@@ -106,6 +106,8 @@ public class PostService {
             p.setUrl(req.url());
             p.setMediaId(req.mediaId());
             p.setFlairId(req.flairId());
+            p.setNsfw(req.nsfw());
+            p.setSpoiler(req.spoiler());
             // Unlike controversial_rank/rising_rank, hot_rank's formula isn't 0 at zero votes (it also
             // carries a time term) — without this, every new post sits at the column default of 0 until its
             // first vote, sorting below any post that's ever been voted on, regardless of how new it is.

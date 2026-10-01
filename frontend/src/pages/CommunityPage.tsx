@@ -1,4 +1,5 @@
-import { useParams, useSearchParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { CommunitySidebar } from '../components/CommunitySidebar';
 import { PostCard } from '../components/PostCard';
 import { PostList } from '../components/PostList';
@@ -14,6 +15,7 @@ export function CommunityPage() {
   const sort = (searchParams.get('sort') as SortType) || 'hot';
   const period = (searchParams.get('t') as TopPeriod) || 'all';
 
+  const { user } = useAuth();
   const { community, rules, pinned, loading, error, actionError, join, leave, requestJoin, applyPinnedVote } = useCommunity(communityName);
   const feed = useFeed(communityName, sort, period);
 
@@ -27,6 +29,11 @@ export function CommunityPage() {
   return (
     <div className={styles.layout}>
       <div className={styles.main}>
+        {user && (
+          <Link to={`/r/${communityName}/submit`} className={styles.createPostButton}>
+            Create Post
+          </Link>
+        )}
         {pinned.length > 0 && (
           <div className={styles.pinnedSection}>
             {pinned.map((post) => (

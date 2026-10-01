@@ -14,8 +14,26 @@ public record CreatePostRequest(
         @Size(max = 40000) String body,
         String url,
         UUID mediaId,
-        UUID flairId
+        UUID flairId,
+        Boolean nsfw,
+        Boolean spoiler
 ) {
+
+    // Records deserialize through their canonical constructor, not individual setters — unlike a
+    // JavaBean, where Jackson simply skips calling the setter for an absent field (leaving the field's
+    // Java-assigned default), an absent record component is passed to the constructor as null. A
+    // primitive boolean nsfw/spoiler would crash unboxing null the moment any caller omits the field
+    // (every script/client written before these fields existed). Boolean wrapper + this compact
+    // constructor normalizes that null to false right here, once, so every other accessor/caller still
+    // sees a plain non-null boolean.
+    public CreatePostRequest {
+        if (nsfw == null) {
+            nsfw = false;
+        }
+        if (spoiler == null) {
+            spoiler = false;
+        }
+    }
 
     // Jakarta Bean Validation discovers any getter-shaped method (isXxx()/getXxx()) via reflection
     // regardless of whether the enclosing class is a record — these three close a real, previously

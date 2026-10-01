@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { CreateMenu } from './CreateMenu';
 import { Logo } from './Logo';
 import styles from './NavBar.module.css';
 
@@ -40,6 +41,7 @@ export function NavBar() {
       <div className={styles.actions}>
         {user ? (
           <div className={styles.userMenu}>
+            <CreateMenu />
             <span className={styles.avatar}>{user.username.slice(0, 1)}</span>
             <span className={styles.username}>{user.username}</span>
             <button type="button" className={styles.logoutButton} onClick={handleLogout}>

@@ -3,9 +3,11 @@ import { useAuth } from './auth/AuthContext';
 import { Layout } from './components/Layout';
 import { CommunityDiscovery } from './pages/CommunityDiscovery';
 import { CommunityPage } from './pages/CommunityPage';
+import { CreateCommunity } from './pages/CreateCommunity';
 import { Home } from './pages/Home';
 import { Login } from './pages/Login';
 import { PostDetail } from './pages/PostDetail';
+import { PostSubmit } from './pages/PostSubmit';
 import { Register } from './pages/Register';
 
 function App() {
@@ -24,8 +26,11 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/r/:communityName/comments/:postId" element={<PostDetail />} />
+        <Route path="/r/:communityName/submit" element={<PostSubmit />} />
         <Route path="/r/:communityName" element={<CommunityPage />} />
         <Route path="/communities" element={<CommunityDiscovery />} />
+        <Route path="/communities/create" element={<CreateCommunity />} />
+        <Route path="/submit" element={<PostSubmit />} />
       </Route>
     </Routes>
   );

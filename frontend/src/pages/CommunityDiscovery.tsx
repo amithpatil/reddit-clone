@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { CommunityCard } from '../components/CommunityCard';
 import { useCommunityBrowse } from '../hooks/useCommunityBrowse';
 import { useCommunitySearch } from '../hooks/useCommunitySearch';
@@ -7,6 +8,7 @@ import type { CommunityBrowseSort } from '../lib/communityApi';
 import styles from './CommunityDiscovery.module.css';
 
 export function CommunityDiscovery() {
+  const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
   const sort = (searchParams.get('sort') as CommunityBrowseSort) || 'popular';
   const urlQuery = searchParams.get('q') ?? '';
@@ -56,7 +58,7 @@ export function CommunityDiscovery() {
 
   return (
     <div>
-      <div className={styles.searchBox}>
+      <div className={styles.searchRow}>
         <input
           className={styles.searchInput}
           type="search"
@@ -64,6 +66,11 @@ export function CommunityDiscovery() {
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
         />
+        {user && (
+          <Link to="/communities/create" className={styles.createButton}>
+            Create Community
+          </Link>
+        )}
       </div>
 
       {!isSearching && (

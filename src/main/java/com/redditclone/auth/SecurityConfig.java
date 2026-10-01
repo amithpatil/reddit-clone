@@ -38,7 +38,11 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        // Idempotency-Key added in F6: PostController.submit requires it, and unlike Authorization/
+        // Content-Type, a browser blocks the actual request client-side if a custom header isn't
+        // explicitly allowed here, even when the preflight itself responds 200 — found by actually
+        // submitting a post from the browser, not just curling the endpoint directly.
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

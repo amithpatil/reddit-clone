@@ -1,9 +1,13 @@
 import { api } from './apiClient';
 import type { Listing } from '../types/listing';
-import type { Community, CommunityRule } from '../types/community';
+import type { Community, CommunityRule, CommunityType } from '../types/community';
 import type { Post } from '../types/post';
 
 export type CommunityBrowseSort = 'popular' | 'new';
+
+export function createCommunity(name: string, description: string, type: CommunityType): Promise<Community> {
+  return api.post('/r', { name, description: description || undefined, type }) as Promise<Community>;
+}
 
 export function fetchCommunityAbout(name: string): Promise<Community> {
   return api.get(`/r/${name}/about`) as Promise<Community>;

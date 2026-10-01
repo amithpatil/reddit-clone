@@ -71,8 +71,8 @@ async function request(path: string, options: RequestInit = {}, isRetry = false)
 
 export const api = {
   get: (path: string) => request(path, { method: 'GET' }),
-  post: (path: string, data?: unknown) =>
-    request(path, { method: 'POST', body: data !== undefined ? JSON.stringify(data) : undefined }),
+  post: (path: string, data?: unknown, headers?: Record<string, string>) =>
+    request(path, { method: 'POST', body: data !== undefined ? JSON.stringify(data) : undefined, headers }),
   patch: (path: string, data?: unknown) =>
     request(path, { method: 'PATCH', body: data !== undefined ? JSON.stringify(data) : undefined }),
   put: (path: string, data?: unknown) =>
