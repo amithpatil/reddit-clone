@@ -1,0 +1,906 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Reddit Clone — Onboarding Report</title>
+<style>
+  @page { size: Letter; margin: 20mm 18mm 20mm 18mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body {
+    font-family: -apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif;
+    font-size: 10.6pt;
+    line-height: 1.55;
+    color: #1d2127;
+    margin: 0;
+  }
+  code, .cite, pre, .mono {
+    font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  .cite {
+    font-size: 0.82em;
+    background: #eef1f5;
+    border: 1px solid #d6dce3;
+    border-radius: 3px;
+    padding: 0.05em 0.4em;
+    color: #2a3a52;
+    white-space: nowrap;
+  }
+  pre {
+    background: #f4f6f8;
+    border: 1px solid #dde3ea;
+    border-radius: 4px;
+    padding: 8px 10px;
+    font-size: 8.8pt;
+    line-height: 1.45;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    page-break-inside: avoid;
+  }
+  h1 { font-size: 22pt; margin: 0 0 4px 0; color: #0f1521; }
+  h2 {
+    font-size: 15pt;
+    color: #ffffff;
+    background: #1f3a5f;
+    padding: 7px 12px;
+    border-radius: 4px;
+    margin: 0 0 14px 0;
+    break-before: page;
+  }
+  .titlepage h2 { break-before: avoid; }
+  .toc { break-before: page; }
+  h3 { font-size: 12.3pt; color: #1f3a5f; margin: 22px 0 8px 0; border-bottom: 2px solid #dde3ea; padding-bottom: 3px; }
+  h4 { font-size: 11pt; color: #2a3a52; margin: 16px 0 6px 0; }
+  p { margin: 0 0 9px 0; }
+  ul, ol { margin: 0 0 10px 0; padding-left: 22px; }
+  li { margin-bottom: 4px; }
+  a { color: #1f5fa8; text-decoration: none; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 14px 0; font-size: 9.6pt; }
+  th, td { border: 1px solid #d6dce3; padding: 5px 8px; text-align: left; vertical-align: top; }
+  th { background: #eef1f5; }
+  .decision {
+    border-left: 4px solid #1f5fa8;
+    background: #f7f9fb;
+    padding: 10px 14px;
+    margin: 12px 0 18px 0;
+    border-radius: 0 4px 4px 0;
+    page-break-inside: avoid;
+  }
+  .decision .label { font-weight: 700; color: #1f3a5f; text-transform: uppercase; font-size: 8.5pt; letter-spacing: 0.04em; margin-right: 6px; }
+  .decision-title { font-size: 11.5pt; font-weight: 700; color: #0f1521; margin: 0 0 6px 0; }
+  .bug {
+    border-left: 4px solid #b5482a;
+    background: #fbf3ef;
+    padding: 10px 14px;
+    margin: 10px 0 14px 0;
+    border-radius: 0 4px 4px 0;
+    page-break-inside: avoid;
+  }
+  .bug .label { font-weight: 700; color: #b5482a; text-transform: uppercase; font-size: 8.5pt; letter-spacing: 0.04em; }
+  .feature {
+    margin: 0 0 16px 0;
+    padding: 10px 14px;
+    border: 1px solid #dde3ea;
+    border-radius: 4px;
+    page-break-inside: avoid;
+  }
+  .feature h4 { margin: 0 0 6px 0; display: flex; justify-content: space-between; }
+  .feature .commit { font-weight: 400; font-size: 8.8pt; color: #6b7684; }
+  .glossary-term {
+    margin: 0 0 14px 0;
+    page-break-inside: avoid;
+  }
+  .glossary-term .term { font-weight: 700; font-size: 11pt; color: #0f1521; }
+  .diagram-wrap {
+    text-align: center;
+    margin: 16px 0;
+    page-break-inside: avoid;
+  }
+  .diagram-wrap svg { max-width: 100%; height: auto; }
+  .diagram-caption {
+    font-size: 9pt;
+    font-style: italic;
+    color: #5a6472;
+    margin-top: 6px;
+  }
+  .callout {
+    background: #fff8e8;
+    border: 1px solid #e8d49a;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 9.6pt;
+    margin: 10px 0;
+  }
+  .section-intro { font-size: 10.8pt; color: #3a4452; margin-bottom: 16px; }
+  .titlepage {
+    break-before: avoid;
+    min-height: 220mm;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  .titlepage .kicker { color: #1f5fa8; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; font-size: 10pt; margin-bottom: 10px; }
+  .titlepage .sub { font-size: 13pt; color: #3a4452; margin-top: 10px; max-width: 480px; }
+  .titlepage .meta { margin-top: 40px; font-size: 9.5pt; color: #6b7684; }
+  .toc ol { list-style: none; padding-left: 0; }
+  .toc li { font-size: 11pt; margin-bottom: 10px; }
+  .toc .sec-num { display: inline-block; width: 28px; color: #1f5fa8; font-weight: 700; }
+  .toc .sub-toc { font-size: 9.5pt; color: #5a6472; margin: 2px 0 2px 34px; }
+  .habit-box {
+    background: #eef6f0;
+    border: 1px solid #b9ddc2;
+    border-radius: 4px;
+    padding: 12px 16px;
+    margin-top: 18px;
+  }
+  .habit-box h4 { margin-top: 0; color: #1d6b3b; }
+</style>
+</head>
+<body>
+
+<!-- ============ TITLE PAGE ============ -->
+<div class="titlepage">
+  <div class="kicker">Onboarding Report</div>
+  <h1>Reddit Clone</h1>
+  <div class="sub">
+    A grounded, file-by-file walkthrough of the backend (Spring Boot modular monolith) and frontend
+    (React / Vite) — written for an engineer whose prior experience is basic Spring Boot CRUD
+    (<span class="mono">@RestController</span>/<span class="mono">@Service</span>/<span class="mono">@Repository</span>/JPA)
+    and nothing beyond it.
+  </div>
+  <div class="meta">
+    Every claim in this report is grounded in the real code in this repository — exact file paths and line
+    numbers are cited throughout. Where a design choice here differs from the simplest possible approach,
+    that difference is called out explicitly: what the naive option would have been, why it wasn't used, and
+    what problem the real approach solves.
+  </div>
+</div>
+
+<!-- ============ TABLE OF CONTENTS ============ -->
+<div class="toc">
+<h2>Contents</h2>
+<ol>
+  <li><span class="sec-num">1.</span><strong>Tech Stack</strong>
+    <div class="sub-toc">Spring Boot &middot; Spring Security &middot; PostgreSQL &middot; Flyway &middot; Redis &middot; WebSocket/STOMP &middot; Argon2 &middot; Docker Compose &middot; React &middot; Vite &middot; TypeScript &middot; react-router</div>
+  </li>
+  <li><span class="sec-num">2.</span><strong>Architecture</strong>
+    <div class="sub-toc">The modular monolith &amp; ArchUnit &middot; Request flow: submitting a post &middot; The Outbox pattern &amp; scheduled jobs &middot; The media upload pipeline &middot; Auth: Argon2, JWT, CORS</div>
+  </li>
+  <li><span class="sec-num">3.</span><strong>Key Design Decisions</strong>
+    <div class="sub-toc">A running log: the naive option, what we built instead, and why — including two real bugs found this phase</div>
+  </li>
+  <li><span class="sec-num">4.</span><strong>Feature Report</strong>
+    <div class="sub-toc">Every shipped feature in build order &middot; what's next &middot; what's parked &middot; what's permanently out of scope</div>
+  </li>
+  <li><span class="sec-num">5.</span><strong>Glossary for Self-Study</strong>
+    <div class="sub-toc">Every non-CRUD concept used in this codebase, with a pointer to where to see it in real use</div>
+  </li>
+</ol>
+</div>
+
+<!-- SECTIONS WILL BE INSERTED HERE -->
+<h2>1. Tech Stack</h2>
+<p class="section-intro">For each technology: what it is (assuming only basic Spring Boot CRUD background), why <em>this project</em> specifically needed it, and exactly where it's configured.</p>
+
+<h3>Spring Boot</h3>
+<p><strong>What it is:</strong> the application framework that assembles a runnable Java web app — an embedded Tomcat server, dependency injection, and auto-configuration driven by "starter" dependencies, so you declare <em>what</em> you need (web, JPA, security&hellip;) instead of hand-wiring it.</p>
+<p><strong>Why this project needed it:</strong> it's the chassis every other piece below plugs into. Worth flagging: this project runs <strong>Spring Boot 4.1.1 on Java 25</strong> — genuinely current, not a safe "LTS minus one" choice — which has already had real consequences: Boot 4 split Flyway's autoconfiguration and Jackson out of the base web starter into their own separate starter dependencies, both of which had to be added explicitly after the app silently failed to run migrations / failed to compile. A useful lesson: being on the newest framework version means occasionally re-deriving things tutorials still assume are automatic.</p>
+<ul>
+  <li>Entry point: <span class="cite">RedditCloneApplication.java:6-11</span> — <code>@SpringBootApplication</code> + <code>SpringApplication.run(...)</code>.</li>
+  <li>Version: <span class="cite">pom.xml:5-9</span> (<code>spring-boot-starter-parent 4.1.1</code>), <span class="cite">pom.xml:30</span> (<code>java.version 25</code>).</li>
+  <li>Starters: <span class="cite">pom.xml:47-79</span> — actuator, data-jpa, security, validation, webmvc, websocket, and an explicitly-added <code>spring-boot-starter-jackson</code>.</li>
+  <li>Port override: <span class="cite">application.yml:1-2</span> — <code>8081</code> (8080 was already in use on the dev machine).</li>
+</ul>
+
+<h3>Spring Security</h3>
+<p><strong>What it is:</strong> a chain of servlet filters sitting in front of every controller, deciding "who is this" (authentication) and "are they allowed to do this" (authorization), configured declaratively via a <code>SecurityFilterChain</code> bean rather than hand-written checks inside each controller method.</p>
+<p><strong>Why this project needed it:</strong> this is a stateless, JWT-bearer-token REST API consumed by a separate-origin SPA — almost none of Spring Security's session-cookie-app defaults apply as-is, and nearly every one had to be deliberately reconfigured (full walkthrough in Section 2): CORS opened for the Vite dev origin, CSRF disabled, sessions set stateless, a custom <code>JwtAuthFilter</code> added, and the default "403 for unauthenticated" behavior overridden to 401.</p>
+<ul>
+  <li>Full configuration: <span class="cite">SecurityConfig.java</span> — CORS (lines 35&ndash;50), CSRF disabled (line 55), stateless sessions (line 57), custom 401 entry point (lines 58&ndash;62), error-dispatch exemption (lines 64&ndash;69), public vs. authenticated routes (lines 70&ndash;85), filter wiring (line 86).</li>
+</ul>
+
+<h3>PostgreSQL</h3>
+<p><strong>What it is:</strong> the relational database storing every piece of durable data.</p>
+<p><strong>Why this project needed it:</strong> a genuinely relational domain, plus three Postgres <strong>extensions</strong> this project leans on directly: <code>citext</code> for case-insensitive unique columns (so <code>AskReddit</code> and <code>askreddit</code> are the same name), <code>pg_trgm</code> for fuzzy community-name search, and <code>ltree</code> for hierarchical comment paths. The <code>citext</code> choice produced a real bug: pgjdbc, by default, binds a Java <code>String</code> as a concrete <code>varchar</code> parameter, which Postgres then has to cast the column down to plain text to compare — silently making username/name lookups case-<em>sensitive</em> even though the column itself is case-insensitive at rest. Fixed with <code>?stringtype=unspecified</code> on the JDBC URL (commit <span class="mono">daec834</span>).</p>
+<ul>
+  <li>Extensions: <span class="cite">V1__users.sql:1-3</span>.</li>
+  <li>App datasource (through PgBouncer, with the fix): <span class="cite">application.yml:7-17</span>.</li>
+  <li>Flyway's own datasource (bypasses PgBouncer): <span class="cite">application.yml:18-21</span>.</li>
+  <li>Docker service: <span class="cite">docker-compose.yml:1-14</span> — <code>postgres:18</code>, host port <code>5434</code> (5432 was taken locally).</li>
+</ul>
+<div class="callout"><strong>Worth knowing:</strong> the app never talks to Postgres directly for normal traffic — every request goes through <strong>PgBouncer</strong>, a connection pooler (<span class="cite">docker-compose.yml:18-28</span>), while Flyway migrations connect straight to Postgres, bypassing the pooler, since Flyway needs an advisory lock Hibernate doesn't.</div>
+
+<h3>Flyway</h3>
+<p><strong>What it is:</strong> a schema-migration tool — instead of Hibernate auto-generating/altering tables (<code>ddl-auto: update</code>, dangerous and non-reproducible across environments), you write numbered, immutable SQL files applied once each, in order.</p>
+<p><strong>Why this project needed it:</strong> the schema evolved across four build phases over <strong>20 migrations</strong>, several of which exist specifically to <em>fix</em> an earlier migration's bug once it was actually exercised live (e.g. a table declared <code>PARTITION BY RANGE</code> since Phase 1 with zero partitions ever created — fixed only once something finally wrote to it). <code>spring.jpa.hibernate.ddl-auto</code> is explicitly <code>validate</code>, not <code>update</code> — Flyway owns the schema, Hibernate only checks its mappings match.</p>
+<ul>
+  <li>Migrations: <span class="cite">src/main/resources/db/migration/V1&ndash;V20</span>.</li>
+  <li>Hibernate deferring to Flyway: <span class="cite">application.yml:22-24</span>.</li>
+  <li>Dependency: <span class="cite">pom.xml:31,91-102</span>.</li>
+</ul>
+
+<h3>Redis</h3>
+<p><strong>What it is:</strong> an in-memory key-value store, used here as a cache — accessed via Spring Data Redis's <code>StringRedisTemplate</code> directly (hand-rolled, not the <code>@Cacheable</code> annotation abstraction).</p>
+<p><strong>Why this project needed it:</strong> a two-level cache in front of the single most expensive, most-hit read in a Reddit-like app — page&nbsp;1 of <code>/hot</code>, anonymous, no cursor — which includes <strong>r/all</strong>, the sitewide aggregate-across-every-community feed built during the frontend phase. An in-process Caffeine cache (5s TTL, fast but per-instance) is backed by Redis (45s TTL, shared) and the whole thing <strong>fails open</strong> — a Redis outage falls back to a plain DB read instead of a 500, since the feed worked before this cache existed.</p>
+<ul>
+  <li>Dependency: <span class="cite">pom.xml:87-90</span>. Connection: <span class="cite">application.yml:26-29</span> — <code>localhost:6380</code>.</li>
+  <li>Docker service: <span class="cite">docker-compose.yml:15-17</span> — <code>redis:8</code>, host port 6380 (6379 was taken locally).</li>
+  <li>Cache implementation: <span class="cite">FeedCacheService.java</span> — design rationale (lines 14&ndash;17), Caffeine layer (24&ndash;25), Redis read/write with fail-open (34&ndash;60).</li>
+  <li>Wired in: <span class="cite">PostController.java:89-127</span> — consulted only for page&nbsp;1 + an unauthenticated viewer.</li>
+</ul>
+
+<h3>WebSocket / STOMP</h3>
+<p><strong>What it is:</strong> WebSocket upgrades an HTTP connection into a persistent, two-way connection — the server can push data at any time, no polling. STOMP is a lightweight messaging sub-protocol on top (<code>SUBSCRIBE</code>, <code>SEND</code>, named destinations), giving <code>@MessageMapping</code> methods a role analogous to <code>@RequestMapping</code> for REST.</p>
+<p><strong>Why this project needed it:</strong> the real-time chat feature (which replaced classic store-and-forward Private Messages — see Section 4) needs to push a new message to the recipient instantly. The genuinely tricky part: a browser's native WebSocket handshake is a plain HTTP GET that JavaScript <strong>cannot</strong> attach a custom <code>Authorization</code> header to. The fix: let the HTTP handshake through unauthenticated, then authenticate one layer up, at the first STOMP <code>CONNECT</code> frame (which <em>can</em> carry custom headers), via a <code>ChannelInterceptor</code> that fails the connection outright if the token is missing or invalid.</p>
+<ul>
+  <li>Dependency: <span class="cite">pom.xml:66-71</span>.</li>
+  <li>Config + the CONNECT-frame auth interceptor: <span class="cite">ChatWebSocketConfig.java</span> — problem explained (18&ndash;25), endpoint registration (36&ndash;41), broker config (43&ndash;51), interceptor (53&ndash;79).</li>
+  <li>Public HTTP route for the handshake: <span class="cite">SecurityConfig.java:81-84</span>.</li>
+</ul>
+
+<h3>Argon2 (password hashing)</h3>
+<p><strong>What it is:</strong> a deliberately slow, memory-hard password-hashing algorithm — the opposite design goal of a fast hash like SHA-256, which an attacker can test billions of times per second against a stolen hash table on a GPU.</p>
+<p><strong>Why this project needed it:</strong> any app storing passwords needs resistance to offline brute-force if the database is ever compromised. Full walkthrough in Section 2.</p>
+<ul>
+  <li>Bean: <span class="cite">SecurityConfig.java:27-30</span> — <code>new Argon2PasswordEncoder(16, 32, 1, 19456, 2)</code>, tuned for ~100&ndash;200ms per hash.</li>
+  <li>Supporting dependency (BouncyCastle, not pulled in automatically): <span class="cite">pom.xml:155-162</span>.</li>
+  <li>Call sites: <span class="cite">AuthService.java</span> — registration (59), login verification (72), account-deletion re-verification (238, 243).</li>
+</ul>
+
+<h3>Docker Compose</h3>
+<p><strong>What it is:</strong> a single YAML file defining a multi-container local dev environment, started together with one command.</p>
+<p><strong>Why this project needed it:</strong> four separate infrastructure pieces locally (database, cache, connection pooler, object storage). Several ports are deliberately non-default, each with an inline reason:</p>
+<ul>
+  <li><strong>postgres</strong> &mdash; <code>postgres:18</code>, host port 5434 (5432 taken locally), healthcheck.</li>
+  <li><strong>redis</strong> &mdash; <code>redis:8</code>, host port 6380 (6379 taken locally).</li>
+  <li><strong>pgbouncer</strong> &mdash; session pooling; needed <code>LISTEN_PORT: 6432</code> (the image defaults its internal listen port to 5432 regardless of the published port) and <code>AUTH_TYPE: scram-sha-256</code> (Postgres 18 defaults to SCRAM; the image's own default of <code>md5</code> fails auth against it).</li>
+  <li><strong>s3mock</strong> &mdash; <code>adobe/s3mock</code>, an S3-compatible mock store for the media pipeline; chosen over the originally-planned MinIO because MinIO's Docker Hub image started requiring auth to pull, even for old pinned tags.</li>
+</ul>
+<p>Full file: <span class="cite">docker-compose.yml</span>.</p>
+
+<h3>React</h3>
+<p><strong>What it is:</strong> a component-based UI library — the interface is a tree of reusable components that re-render automatically when their state changes.</p>
+<p><strong>Why this project needed it:</strong> the frontend is a full SPA, decoupled from the backend, talking to it purely over REST + WebSocket — React is the standard choice for this kind of client-rendered, highly-interactive UI (voting, live chat, nested comment trees).</p>
+<ul>
+  <li>Dependencies: <span class="cite">frontend/package.json:12-16</span> — <code>react ^19.2.8</code>, <code>react-dom ^19.2.8</code>, <code>react-router-dom ^7.18.4</code>.</li>
+  <li>Entry point: <span class="cite">frontend/src/main.tsx</span>.</li>
+</ul>
+
+<h3>Vite</h3>
+<p><strong>What it is:</strong> a frontend build tool and dev server — near-instant hot-reload in development, an optimized bundle for production.</p>
+<p><strong>Why this project needed it:</strong> it's the dev server/bundler for the React frontend. One project-specific detail: <strong>the dev server is pinned to port 5174, not Vite's default 5173</strong>, with <code>strictPort: true</code> — because the backend's CORS allowlist hardcodes <code>http://localhost:5174</code>. Change this port in one place without the other, and the frontend starts fine while every API call silently fails CORS.</p>
+<ul>
+  <li>Config: <span class="cite">frontend/vite.config.ts:6-9</span>. Matching backend origin: <span class="cite">application.yml:54</span>.</li>
+</ul>
+
+<h3>TypeScript</h3>
+<p><strong>What it is:</strong> a superset of JavaScript adding static types, catching mismatches at compile time instead of at runtime in the browser.</p>
+<p><strong>Why this project needed it:</strong> for an SPA calling a typed REST API, TypeScript catches an entire class of bugs before the code ever runs. The build script (<code>tsc -b && vite build</code>) runs the compiler as a build gate <em>before</em> bundling.</p>
+<ul>
+  <li>Config: <span class="cite">frontend/tsconfig.json</span>, <span class="cite">tsconfig.app.json</span>. Build script: <span class="cite">frontend/package.json:8</span>.</li>
+</ul>
+
+<h3>react-router (react-router-dom)</h3>
+<p><strong>What it is:</strong> client-side routing for SPAs — intercepts URL changes and swaps which component renders, without a full page reload. Plays the role client-side that <code>@GetMapping("/path")</code> plays server-side.</p>
+<p><strong>Why this project needed it:</strong> the frontend is a genuine multi-page experience (home feed, login, a community page, post-detail-and-comments, post submission, community discovery/creation) served from one SPA bundle.</p>
+<ul>
+  <li>Router setup: <span class="cite">frontend/src/main.tsx</span> — <code>&lt;BrowserRouter&gt;</code> wraps <code>&lt;AuthProvider&gt;&lt;App /&gt;&lt;/AuthProvider&gt;</code>.</li>
+  <li>Route table: <span class="cite">frontend/src/App.tsx</span> — including two different routes (<code>/submit</code> and <code>/r/:communityName/submit</code>) that both render <code>PostSubmit</code>, branching internally on whether a community was pre-selected.</li>
+</ul>
+
+<h3>Other dependencies worth knowing about</h3>
+<ul>
+  <li><strong>ArchUnit</strong> — mechanically enforces the modular-monolith boundaries described in Section 2; not just a documented convention.</li>
+  <li><strong>UUIDv7</strong> — every generated ID is a time-ordered UUID (sorts naturally, friendlier to index locality) rather than random UUIDv4 or auto-increment.</li>
+  <li><strong>ShedLock</strong> — distributed locking for <code>@Scheduled</code> jobs, so a job never runs concurrently from two app instances.</li>
+  <li><strong>Bucket4j</strong> — a rate-limiting library already in <code>pom.xml</code> but not yet wired to any endpoint (see Section 4).</li>
+</ul>
+<!-- SECTION_1_PLACEHOLDER -->
+<h2>2. Architecture</h2>
+<p class="section-intro">Written assuming only basic CRUD experience. Every claim cites an exact file and line — read the real code alongside this explanation.</p>
+
+<h3>The modular monolith: package structure and ArchUnit</h3>
+<p>The whole app is <strong>one deployable</strong> — one JVM, one <code>.jar</code>. That's the "monolith" half. The "modular" half is a convention this codebase enforces much more strictly than most: code is split into package-per-feature modules, and a module may only call another module's <code>@Service</code> class — never reach directly into its <code>@Repository</code>. This gets most of the separation benefit people reach for microservices for, without any network calls or deployment complexity.</p>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 780 600" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f3a5f"/></marker>
+  <marker id="a1r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b5482a"/></marker>
+  <marker id="a1g" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#8a94a3"/></marker>
+</defs>
+<!-- legend -->
+<g font-family="sans-serif" font-size="9.6">
+  <rect x="628" y="92" width="148" height="62" rx="5" fill="#ffffff" stroke="#d6dce3"/>
+  <line x1="636" y1="106" x2="662" y2="106" stroke="#1f3a5f" stroke-width="2" marker-end="url(#a1)"/><text x="668" y="109" fill="#3a4452">depends on</text>
+  <line x1="636" y1="124" x2="662" y2="124" stroke="#b5482a" stroke-width="2" stroke-dasharray="4,3" marker-end="url(#a1r)"/><text x="668" y="127" fill="#3a4452">forbidden</text>
+  <line x1="636" y1="142" x2="662" y2="142" stroke="#8a94a3" stroke-width="1.6" stroke-dasharray="2,3" marker-end="url(#a1g)"/><text x="668" y="145" fill="#3a4452">reference only</text>
+</g>
+<!-- row 1: feature modules -->
+<g font-family="sans-serif">
+  <rect x="12" y="30" width="140" height="46" rx="7" fill="#eef3fa" stroke="#1f3a5f" stroke-width="1.4"/><text x="82" y="58" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">job</text>
+  <rect x="166" y="30" width="140" height="46" rx="7" fill="#eef3fa" stroke="#1f3a5f" stroke-width="1.4"/><text x="236" y="58" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">chat</text>
+  <rect x="320" y="30" width="140" height="46" rx="7" fill="#eef3fa" stroke="#1f3a5f" stroke-width="1.4"/><text x="390" y="58" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">notify</text>
+  <rect x="474" y="30" width="140" height="46" rx="7" fill="#eef3fa" stroke="#1f3a5f" stroke-width="1.4"/><text x="544" y="58" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">moderation</text>
+  <rect x="628" y="30" width="140" height="46" rx="7" fill="#eef3fa" stroke="#1f3a5f" stroke-width="1.4"/><text x="698" y="58" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">engagement</text>
+</g>
+<!-- row 2: vote (special) -->
+<rect x="320" y="120" width="140" height="46" rx="7" fill="#fde9d9" stroke="#b5482a" stroke-width="1.6"/><text x="390" y="148" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="700" fill="#7a3416">vote</text>
+<!-- row 3: comment -->
+<rect x="320" y="200" width="140" height="46" rx="7" fill="#eef3fa" stroke="#1f3a5f" stroke-width="1.4"/><text x="390" y="228" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#0f1521">comment</text>
+<!-- row 4: post -->
+<rect x="320" y="280" width="140" height="46" rx="7" fill="#eef3fa" stroke="#1f3a5f" stroke-width="1.4"/><text x="390" y="308" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="600" fill="#0f1521">post</text>
+<!-- row 5: core/leaf -->
+<g font-family="sans-serif">
+  <rect x="150" y="360" width="140" height="46" rx="7" fill="#eaf7ee" stroke="#2f7d4f" stroke-width="1.4"/><text x="220" y="388" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">auth</text>
+  <rect x="320" y="360" width="140" height="46" rx="7" fill="#eaf7ee" stroke="#2f7d4f" stroke-width="1.4"/><text x="390" y="388" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">community</text>
+  <rect x="490" y="360" width="140" height="46" rx="7" fill="#eaf7ee" stroke="#2f7d4f" stroke-width="1.4"/><text x="560" y="388" text-anchor="middle" font-size="13" font-weight="600" fill="#0f1521">media</text>
+</g>
+<!-- row 6: common -->
+<rect x="20" y="450" width="740" height="56" rx="7" fill="#e4e7ec" stroke="#5a6472" stroke-width="1.4"/>
+<text x="390" y="474" text-anchor="middle" font-family="sans-serif" font-size="13" font-weight="700" fill="#2a3340">common</text>
+<text x="390" y="492" text-anchor="middle" font-family="sans-serif" font-size="9.5" fill="#4a5564">shared infrastructure (OutboxWriter, exceptions, pagination, text sanitizer) — used by every module above</text>
+<!-- arrows -->
+<g stroke="#1f3a5f" stroke-width="1.8" fill="none" marker-end="url(#a1)">
+  <path d="M390,166 L390,200"/> <!-- vote -> comment -->
+  <path d="M460,143 L600,143 L600,303 L460,303"/> <!-- vote -> post (wraparound) -->
+  <path d="M390,246 L390,280"/> <!-- comment -> post -->
+  <path d="M390,326 L390,360"/> <!-- post -> community -->
+  <path d="M320,303 L220,303 L220,360"/> <!-- post -> auth -->
+  <path d="M460,295 L560,295 L560,360"/> <!-- post -> media -->
+  <path d="M544,76 L544,250 L390,250 L390,280"/> <!-- moderation -> post -->
+  <path d="M390,90 L80,90 L80,383 L150,383"/> <!-- notify -> auth -->
+  <path d="M236,76 L236,360"/> <!-- chat -> auth -->
+</g>
+<path d="M698,76 L698,310 L460,310" stroke="#8a94a3" stroke-width="1.4" stroke-dasharray="2,4" fill="none" marker-end="url(#a1g)"/> <!-- engagement -> post, reference only -->
+<path d="M500,280 L500,166" stroke="#b5482a" stroke-width="2" stroke-dasharray="5,4" fill="none" marker-end="url(#a1r)"/> <!-- post -> vote forbidden -->
+<text x="508" y="200" font-family="sans-serif" font-size="9" fill="#b5482a" font-weight="600">✕ forbidden</text>
+<text x="508" y="212" font-family="sans-serif" font-size="8.3" fill="#b5482a">would create a cycle</text>
+</svg>
+<div class="diagram-caption">Fig. 1 — Module layout. Arrows not drawn for space: <span class="mono">comment → community</span>, <span class="mono">comment → auth</span>, <span class="mono">moderation → community</span>, <span class="mono">moderation → comment</span> (same pattern as the ones shown). <span class="mono">job</span> has no service-level dependencies — it runs scheduled raw-SQL statements directly against tables.</div>
+</div>
+
+<table>
+<tr><th>Package</th><th>Owns</th></tr>
+<tr><td><span class="mono">auth</span></td><td>User identity, credentials (Argon2), JWT issuing/parsing, refresh-token rotation, site-wide admin actions</td></tr>
+<tr><td><span class="mono">post</span></td><td>The <span class="mono">Post</span> entity, submission, all feed listings/sorts, search, pin/lock, the <span class="mono">/hot</span> cache</td></tr>
+<tr><td><span class="mono">comment</span></td><td>The <span class="mono">Comment</span> entity, nested reply tree, comment sort options</td></tr>
+<tr><td><span class="mono">community</span></td><td>Communities, membership, moderators, bans, flairs, automod rules, join requests</td></tr>
+<tr><td><span class="mono">vote</span></td><td>Upvote/downvote state, the vote outbox worker, karma ledger — kept deliberately isolated</td></tr>
+<tr><td><span class="mono">moderation</span></td><td>Human moderator actions: reports, mod queue, mod-mail, the moderation action log</td></tr>
+<tr><td><span class="mono">notify</span></td><td>User-facing notifications and their own outbox-drain worker</td></tr>
+<tr><td><span class="mono">engagement</span></td><td>Saved/hidden items — small, generic, cross-cutting per-user state</td></tr>
+<tr><td><span class="mono">media</span></td><td>Uploads, presigned URLs, image/video processing workers</td></tr>
+<tr><td><span class="mono">chat</span></td><td>Real-time direct messaging over STOMP/WebSocket</td></tr>
+<tr><td><span class="mono">job</span></td><td>Scheduled jobs not tied to one module's own write path (rank decay, nightly reconciliation)</td></tr>
+<tr><td><span class="mono">common</span></td><td>Genuinely shared infrastructure: the outbox writer, exceptions, pagination types, text sanitization</td></tr>
+</table>
+
+<h4>The ArchUnit rule that enforces this mechanically</h4>
+<p>File: <span class="cite">ModuleBoundaryTest.java</span>. ArchUnit is a library that lets you write architecture rules as ordinary JUnit tests — it statically scans your <em>compiled classes</em> and checks structural rules like "no cycles between these packages." A violation fails the build the same way a broken unit test would.</p>
+<p>Two kinds of rules are defined. First, cycle-freedom across every top-level module:</p>
+<pre>@ArchTest
+static final ArchRule modules_are_free_of_cycles =
+        SlicesRuleDefinition.slices().matching("com.redditclone.(*)..").should().beFreeOfCycles();</pre>
+<p>Second, ten near-identical rules — one per module:</p>
+<pre>private static ArchRule repositoryAccessRule(String modulePackage) {
+    return classes()
+            .that().resideInAPackage(modulePackage)
+            .and().haveSimpleNameEndingWith("Repository")
+            .should().onlyBeAccessed().byClassesThat()
+            .resideInAnyPackage(modulePackage, "..common..");
+}</pre>
+<p>In plain English: any Spring Data repository interface in module X can only be injected into classes in module X (or <span class="mono">common</span>). No module may autowire another module's repository directly — it must go through that module's service class.</p>
+
+<div class="callout"><strong>A concrete example — why vote state isn't a field on <span class="mono">Post</span>.</strong> The repository rule alone doesn't literally forbid <span class="mono">post</span> depending on <span class="mono">vote</span>. What actually makes that impossible is the combination of two facts: <span class="mono">vote.VoteService</span> already imports <span class="mono">post.PostService</span> and <span class="mono">comment.CommentService</span> (to validate a target exists before accepting a vote on it), and the cycle-freedom rule means nothing can depend back on <span class="mono">vote</span> without creating a forbidden cycle (confirmed — a grep across <span class="mono">post</span>/<span class="mono">comment</span> for <span class="mono">import com.redditclone.vote</span> finds nothing). The visible consequence: a feed or comment-tree response can never carry "did I already vote on this," because <span class="mono">PostService</span>/<span class="mono">CommentService</span> have no legal way to call into <span class="mono">vote</span>. That's exactly why the frontend makes a <strong>second, separate call</strong> — <span class="cite">GET /api/vote/mine</span> (<span class="cite">VoteController.java:40-48</span>) — and composes the two results client-side. The comment directly above that endpoint says so: <em>"Lets the frontend render correct vote-arrow state after a reload — the feed/comment-tree endpoints themselves can't carry this."</em></div>
+
+<p>This test once caught a real mistake during the original build: <span class="mono">SecurityConfig</span> was initially placed in the shared <span class="mono">common</span> package, creating a cycle (<span class="mono">common</span> depending on <span class="mono">auth.JwtAuthFilter</span>, while <span class="mono">auth</span> depended on <span class="mono">common</span> for exceptions) — moved into <span class="mono">auth</span> to fix it, since it's fundamentally auth's own configuration.</p>
+
+<h3>Request flow: submitting a post, end to end</h3>
+<p>Walking <span class="mono">POST /r/{communityName}/submit</span> through every layer.</p>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 560" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f3a5f"/></marker>
+  <marker id="a2d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#5a6472"/></marker>
+</defs>
+<g font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0f1521">
+  <text x="60" y="18" text-anchor="middle">Browser</text>
+  <text x="210" y="18" text-anchor="middle">Security filter chain</text>
+  <text x="360" y="18" text-anchor="middle">PostController</text>
+  <text x="500" y="18" text-anchor="middle">PostService</text>
+  <text x="620" y="18" text-anchor="middle">Redis</text>
+  <text x="710" y="18" text-anchor="middle">Postgres</text>
+</g>
+<g stroke="#c7cedb" stroke-width="1.2">
+  <line x1="60" y1="26" x2="60" y2="540"/><line x1="210" y1="26" x2="210" y2="540"/>
+  <line x1="360" y1="26" x2="360" y2="540"/><line x1="500" y1="26" x2="500" y2="540"/>
+  <line x1="620" y1="26" x2="620" y2="540"/><line x1="710" y1="26" x2="710" y2="540"/>
+</g>
+<g font-family="sans-serif" font-size="9.3" fill="#1d2127">
+  <line x1="60" y1="48" x2="210" y2="48" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a2)"/>
+  <text x="65" y="44">POST /r/{name}/submit, Authorization: Bearer &lt;jwt&gt;, Idempotency-Key</text>
+
+  <rect x="190" y="58" width="190" height="34" rx="5" fill="#f4f6f8" stroke="#c7cedb"/>
+  <text x="285" y="71" text-anchor="middle">JwtAuthFilter validates token,</text>
+  <text x="285" y="83" text-anchor="middle">sets SecurityContext; route rule</text>
+  <text x="285" y="94" text-anchor="middle" font-style="italic">(anyRequest().authenticated() → passes)</text>
+
+  <line x1="210" y1="112" x2="360" y2="112" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a2)"/>
+  <text x="215" y="108">@AuthenticationPrincipal UUID userId resolved</text>
+
+  <line x1="360" y1="134" x2="500" y2="134" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a2)"/>
+  <text x="365" y="130">create(userId, communityId, req, idempotencyKey)</text>
+
+  <line x1="500" y1="156" x2="620" y2="156" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a2)"/>
+  <text x="505" y="152">SETNX idempotency:&lt;user&gt;:&lt;key&gt;</text>
+  <line x1="620" y1="176" x2="500" y2="176" stroke="#5a6472" stroke-width="1.4" stroke-dasharray="4,3" marker-end="url(#a2d)"/>
+  <text x="505" y="172">claimed (first time seeing this key)</text>
+
+  <rect x="430" y="188" width="200" height="56" rx="5" fill="#f4f6f8" stroke="#c7cedb"/>
+  <text x="530" y="202" text-anchor="middle">check ban + post access + media</text>
+  <text x="530" y="214" text-anchor="middle">ownership + flair; sanitize title/body;</text>
+  <text x="530" y="226" text-anchor="middle">build Post entity; run automod</text>
+  <text x="530" y="238" text-anchor="middle" font-style="italic">(removed=true set here if flagged)</text>
+
+  <line x1="500" y1="260" x2="710" y2="260" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a2)"/>
+  <text x="505" y="256">posts.save(p) → INSERT INTO posts (...)</text>
+  <line x1="710" y1="280" x2="500" y2="280" stroke="#5a6472" stroke-width="1.4" stroke-dasharray="4,3" marker-end="url(#a2d)"/>
+  <text x="505" y="276">row created</text>
+
+  <line x1="500" y1="302" x2="360" y2="302" stroke="#5a6472" stroke-width="1.4" stroke-dasharray="4,3" marker-end="url(#a2d)"/>
+  <text x="365" y="298">Post (hotRank set, display fields attached)</text>
+
+  <line x1="360" y1="324" x2="60" y2="324" stroke="#5a6472" stroke-width="1.4" stroke-dasharray="4,3" marker-end="url(#a2d)"/>
+  <text x="65" y="320">200 OK { id, title, communityName, ... }</text>
+</g>
+<rect x="30" y="340" width="700" height="80" rx="6" fill="#fbf3ef" stroke="#e0bfae"/>
+<text x="45" y="358" font-family="sans-serif" font-size="9.6" font-weight="700" fill="#b5482a">If anything above throws (e.g. a ban check):</text>
+<text x="45" y="374" font-family="sans-serif" font-size="9.3" fill="#3a4452">PostService's catch block deletes the Redis idempotency key before rethrowing. The Redis claim happened</text>
+<text x="45" y="388" font-family="sans-serif" font-size="9.3" fill="#3a4452">outside the DB transaction, so a rolled-back insert would NOT otherwise release it — leaving a legitimate</text>
+<text x="45" y="402" font-family="sans-serif" font-size="9.3" fill="#3a4452">retry silently blocked behind a misleading duplicate-key error for up to 24 hours.</text>
+</svg>
+<div class="diagram-caption">Fig. 2 — <span class="mono">POST /r/{communityName}/submit</span>, end to end. Solid arrows = calls; dashed arrows = returns.</div>
+</div>
+
+<h4>DTOs vs. entities — why there are two classes for "a post"</h4>
+<p><span class="cite">CreatePostRequest.java</span> is a Java record with exactly 8 fields — <span class="mono">kind, title, body, url, mediaId, flairId, nsfw, spoiler</span> — plus Bean Validation annotations and a few cross-field checks (e.g. a <span class="mono">link</span> post requires a <span class="mono">url</span>). <span class="cite">Post.java</span> is the full JPA entity with roughly 20 fields, most of which the client never sends: <span class="mono">score, commentCount, hotRank, risingRank, pinned, locked, removed</span>, plus <span class="mono">@Transient</span> display-only fields populated only at read time.</p>
+<p>Why not just use <span class="mono">Post</span> as the request body directly?</p>
+<ol>
+  <li><strong>Mass-assignment safety.</strong> If a client could POST a raw <span class="mono">Post</span> JSON body, nothing would stop it setting <span class="mono">score=999999</span> or <span class="mono">removed=false</span> on creation. The DTO has no field for those — there's nothing to bind.</li>
+  <li><strong>Validation belongs on the input shape</strong>, not the persisted shape — "a link post needs a URL" is a rule about what a client may submit, not an invariant of every stored row (a post rehydrated for display never goes through these checks).</li>
+  <li><strong>The entity carries JPA concerns</strong> — setters deliberately restricted to one legitimate caller (<span class="mono">score</span> has no public setter at all; it's only mutated via the batched vote-processing update described below) — that have no business being exposed over the wire.</li>
+</ol>
+<p><span class="mono">PostService.create</span> is the translation layer: it validates the DTO, then explicitly copies individual fields onto a freshly constructed entity — never accepting or returning an entity as a raw, client-controlled request body.</p>
+
+<h3>Async and event-driven pieces: the Outbox pattern and scheduled jobs</h3>
+<p>In basic CRUD, a controller method does its one job and returns. Here, several user actions need to trigger slower downstream work without the request waiting on it. Two mechanisms handle this: the <strong>Outbox pattern</strong> for work triggered by a specific user action, and <strong><span class="mono">@Scheduled</span> jobs</strong> for correcting things on a clock, independent of any request.</p>
+
+<h4>The Outbox pattern, via vote processing</h4>
+<p>When a user upvotes a post, two things need to happen: (1) record the vote, (2) update score/karma/rank. The outbox pattern splits these — step 1 happens synchronously and also writes a small "this happened" event row <strong>in the same database transaction</strong>, so neither can be lost without the other; step 2 happens later, batched, in a background worker.</p>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 780 380" xmlns="http://www.w3.org/2000/svg">
+<defs><marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f3a5f"/></marker></defs>
+<rect x="14" y="14" width="752" height="140" rx="6" fill="#eef3fa" stroke="#9fb3cc" stroke-dasharray="5,3"/>
+<text x="26" y="32" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#1f3a5f">SYNCHRONOUS — inside the HTTP request, one database transaction</text>
+<g font-family="sans-serif" font-size="10">
+  <rect x="30" y="50" width="150" height="80" rx="6" fill="#ffffff" stroke="#1f3a5f"/>
+  <text x="105" y="74" text-anchor="middle">VoteController</text>
+  <text x="105" y="92" text-anchor="middle" font-size="8.6">POST /api/vote</text>
+  <line x1="180" y1="90" x2="228" y2="90" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a3)"/>
+  <rect x="230" y="50" width="200" height="80" rx="6" fill="#ffffff" stroke="#1f3a5f"/>
+  <text x="330" y="70" text-anchor="middle">VoteService.castPostVote</text>
+  <text x="330" y="86" text-anchor="middle" font-size="8.6">advisory lock (userId, postId),</text>
+  <text x="330" y="99" text-anchor="middle" font-size="8.6">upsert post_votes row</text>
+  <line x1="430" y1="90" x2="478" y2="90" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a3)"/>
+  <rect x="480" y="50" width="260" height="80" rx="6" fill="#fde9d9" stroke="#b5482a"/>
+  <text x="610" y="70" text-anchor="middle">outbox_events</text>
+  <text x="610" y="86" text-anchor="middle" font-size="8.6">INSERT (eventType="post_vote_cast",</text>
+  <text x="610" y="99" text-anchor="middle" font-size="8.6">payload={postId, oldDir, newDir})</text>
+</g>
+<text x="390" y="170" text-anchor="middle" font-family="sans-serif" font-size="9.6" font-style="italic" fill="#5a6472">⏱ up to ~2 seconds later, independent of this request</text>
+<rect x="14" y="184" width="752" height="182" rx="6" fill="#f4f6f8" stroke="#aab2bf" stroke-dasharray="5,3"/>
+<text x="26" y="202" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#2a3340">ASYNCHRONOUS — OutboxWorker, @Scheduled(fixedDelay = 2000), ShedLock-coordinated</text>
+<g font-family="sans-serif" font-size="9.6" fill="#1d2127">
+  <text x="30" y="226">1. <tspan font-family="monospace">SELECT ... WHERE processed_at IS NULL ORDER BY id LIMIT 500 FOR UPDATE SKIP LOCKED</tspan></text>
+  <text x="30" y="246">2. Group the batch by target post/comment id — one post that got 40 votes this tick becomes <tspan font-weight="700">one</tspan> net delta, not 40.</text>
+  <text x="30" y="266">3. Batch-UPDATE <tspan font-family="monospace">posts.score/ups/downs</tspan>, recompute &amp; UPDATE <tspan font-family="monospace">hot_rank / controversial_rank / rising_rank</tspan>.</text>
+  <text x="30" y="286">4. Insert <tspan font-family="monospace">karma_log</tspan> rows (raw JDBC, not JPA save — avoids a spurious SELECT-before-INSERT); grouped karma UPDATE per author.</text>
+  <text x="30" y="306">5. <tspan font-family="monospace">UPDATE outbox_events SET processed_at = now()</tspan> for every event in the batch.</text>
+  <text x="30" y="332" font-style="italic" fill="#5a6472">Each event is processed inside its own try/catch — one corrupt payload can't roll back or stall the whole batch.</text>
+  <text x="30" y="350" font-style="italic" fill="#5a6472"><tspan font-family="monospace">NotificationOutboxWorker</tspan> shares this same table (partitioned by event_type) with its own independent 2s loop.</text>
+</g>
+</svg>
+<div class="diagram-caption">Fig. 3 — The Outbox pattern: cast a vote now, apply its downstream effects in the next batch.</div>
+</div>
+
+<p><strong>Why not synchronous?</strong> (1) Unpredictable fan-out cost — a vote can trigger an UPDATE, a re-read, three rank recomputations, a karma insert, and an author UPDATE; inline, every click would wait on all of it. (2) Batching only works when deferred — grouping 40 votes into one UPDATE is only possible because they accumulate first. (3) Partial-failure isolation — a bad event can't roll back or delay the original request, which already committed independently. (4) Room to scale out later — the <span class="mono">FOR UPDATE SKIP LOCKED</span> design means this can later run across multiple app instances with no rewrite. The cost: a small window (≤ ~2s) where a fresh vote hasn't yet moved the numbers — an accepted trade-off, not an oversight.</p>
+
+<h4>Scheduled jobs: correcting things that aren't tied to any one request</h4>
+<p>All share the same shape — <span class="mono">@Scheduled</span> (when), <span class="mono">@SchedulerLock</span> (only one instance runs it), wired up by <span class="cite">SchedulingConfig.java</span>, which also points the lock provider at the <strong>database's own clock</strong> to avoid clock-skew bugs across instances.</p>
+<ul>
+  <li><strong><span class="mono">RankDecayJob</span></strong> <span class="cite">(RankDecayJob.java)</span> — every 5 minutes, halves every post's <span class="mono">rising_rank</span> (a <em>velocity</em> measure — "votes per minute, right now"). The instant voting slows down, that number goes stale; there's no future request that would naturally recompute it, since viewing a post doesn't change its vote velocity. Something has to walk the table on a clock.</li>
+  <li><strong><span class="mono">ReconciliationJob</span></strong> <span class="cite">(ReconciliationJob.java)</span> — nightly at 03:30. This project deliberately omits foreign keys on <span class="mono">post_votes</span>, <span class="mono">comment_votes</span>, and <span class="mono">comments</span>; without FKs, nothing stops or flags an orphaned row. This job sweeps for exactly that drift — auto-deleting orphaned votes (safe, no content of their own) but only counting+logging orphaned comments (real content, worth a human look).</li>
+  <li><strong><span class="mono">MediaReaperJob</span></strong> — covered below, since it's part of the media pipeline's failure-recovery story.</li>
+</ul>
+<div class="callout"><strong>The one idea that unlocks all of these:</strong> a <span class="mono">@Scheduled</span> job exists whenever a problem is <em>not request-shaped</em> — there's no single incoming request whose handler could reasonably notice and fix it, either because the trigger is time itself (decay), the database won't catch the drift on its own (reconciliation), or the process that was supposed to finish the work might not exist anymore (a crash mid-upload).</div>
+
+<h3>The media upload pipeline</h3>
+<p>Every basic file-upload tutorial looks like <span class="mono">@PostMapping(consumes = MULTIPART_FORM_DATA_VALUE) void upload(@RequestParam MultipartFile file)</span>. This project does <strong>not</strong> do that anywhere. The raw bytes never pass through this Spring backend — the backend's only job is to (a) hand out a short-lived signed URL pointing at the object storage service, and (b) track state in Postgres.</p>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 760 520" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f3a5f"/></marker>
+  <marker id="a4h" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b5482a"/></marker>
+</defs>
+<g font-family="sans-serif" font-size="10.5" font-weight="700" fill="#0f1521">
+  <text x="70" y="18" text-anchor="middle">Browser</text>
+  <text x="300" y="18" text-anchor="middle">Backend (MediaService)</text>
+  <text x="560" y="18" text-anchor="middle">Storage (s3mock / R2)</text>
+</g>
+<g stroke="#c7cedb" stroke-width="1.2">
+  <line x1="70" y1="26" x2="70" y2="500"/><line x1="300" y1="26" x2="300" y2="500"/><line x1="560" y1="26" x2="560" y2="500"/>
+</g>
+<g font-family="sans-serif" font-size="9.3" fill="#1d2127">
+  <line x1="70" y1="48" x2="300" y2="48" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a4)"/>
+  <text x="75" y="44">POST /api/media/upload-url {filename, contentType, byteSize}</text>
+  <rect x="200" y="58" width="200" height="40" rx="5" fill="#f4f6f8" stroke="#c7cedb"/>
+  <text x="300" y="72" text-anchor="middle">classify image/video, check size,</text>
+  <text x="300" y="84" text-anchor="middle">ask S3 SDK to sign a PUT</text>
+  <text x="300" y="94" text-anchor="middle" font-style="italic">(pure crypto — no network call yet)</text>
+  <line x1="300" y1="112" x2="70" y2="112" stroke="#5a6472" stroke-width="1.4" stroke-dasharray="4,3" marker-end="url(#a4)"/>
+  <text x="75" y="108">{ mediaId, uploadUrl }  — a Media row is saved, status "pending"</text>
+</g>
+<rect x="20" y="126" width="700" height="46" rx="6" fill="#fbf3ef" stroke="#b5482a" stroke-width="1.3"/>
+<line x1="70" y1="149" x2="560" y2="149" stroke="#b5482a" stroke-width="2.4" marker-end="url(#a4h)"/>
+<text x="300" y="140" text-anchor="middle" font-family="sans-serif" font-size="9.6" font-weight="700" fill="#7a2f1a">PUT &lt;uploadUrl&gt;, raw file bytes — DIRECT, bypasses the backend entirely</text>
+<g font-family="sans-serif" font-size="9.3" fill="#1d2127">
+  <line x1="70" y1="192" x2="300" y2="192" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a4)"/>
+  <text x="75" y="188">POST /api/media/{id}/complete</text>
+  <line x1="300" y1="212" x2="560" y2="212" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a4)"/>
+  <text x="305" y="208">HEAD object (the real, authoritative byte count)</text>
+  <line x1="560" y1="232" x2="300" y2="232" stroke="#5a6472" stroke-width="1.4" stroke-dasharray="4,3" marker-end="url(#a4)"/>
+  <text x="305" y="228">content-length</text>
+  <line x1="300" y1="252" x2="70" y2="252" stroke="#5a6472" stroke-width="1.4" stroke-dasharray="4,3" marker-end="url(#a4)"/>
+  <text x="75" y="248">200 OK — status flips "pending" → "uploaded"</text>
+</g>
+<text x="380" y="282" text-anchor="middle" font-family="sans-serif" font-size="9.6" font-style="italic" fill="#5a6472">⏱ fully async from here — no client involved</text>
+<rect x="20" y="294" width="700" height="210" rx="6" fill="#f4f6f8" stroke="#aab2bf" stroke-dasharray="5,3"/>
+<text x="36" y="314" font-family="sans-serif" font-size="10.5" font-weight="700" fill="#2a3340">ImageProcessingWorker (every 2s) / VideoProcessingWorker (every 10s, own thread pool)</text>
+<g font-family="sans-serif" font-size="9.6" fill="#1d2127">
+  <text x="36" y="338">1. Claim a batch: <tspan font-family="monospace">UPDATE ... WHERE status='uploaded' ... FOR UPDATE SKIP LOCKED RETURNING ...</tspan> (same idiom as the vote outbox worker).</text>
+  <text x="36" y="360">2. Download the original from storage; sniff the real format from magic bytes — never trust the client's declared content-type.</text>
+  <text x="36" y="382">3. Image: resize to a 256px thumbnail + 1280px display JPEG (Thumbnailator). Video/GIF: ffmpeg → capped-resolution H.264 MP4 + a JPEG frame.</text>
+  <text x="36" y="404">4. Upload the result(s) back to storage; mark the row "ready" with thumbnail/display keys and dimensions.</text>
+  <text x="36" y="426" fill="#b5482a" font-weight="600">On failure: retried up to 5 attempts (back to "uploaded"), then permanently "failed".</text>
+  <text x="36" y="448" fill="#b5482a" font-weight="600">MediaReaperJob (every 5 min): if the app crashes mid-job, a row can be stuck "processing" forever — the worker that</text>
+  <text x="36" y="466" fill="#b5482a" font-weight="600">claimed it no longer exists. The reaper sweeps anything "processing" for &gt;10 minutes back to retry, or to "failed".</text>
+</g>
+</svg>
+<div class="diagram-caption">Fig. 4 — The presigned-upload flow. The 20MB/200MB file transfer never touches a Tomcat thread, the app's heap, or its network link.</div>
+</div>
+
+<p><strong>Why presigned URLs instead of <span class="mono">MultipartFile</span>?</strong> (1) Byte ceilings here are real and large (20MB images, 200MB videos per <span class="cite">application.yml:47-48</span>) — routing that through a multipart endpoint means the whole file flows through a Tomcat request thread and the JVM heap before the app can do anything with it. (2) The app's job shrinks to "sign a request," not "move bytes" — presigning is pure in-memory cryptography that never even contacts storage, versus proxying, which would mean receiving the whole file and then making its own outbound call to push it on — doubling the transfer. (3) Verification happens where it's cheap and authoritative — one <span class="mono">HEAD</span> request at completion, not streaming and counting every byte in the app itself.</p>
+
+<h3>Auth: Argon2, JWT access + refresh rotation, and CORS</h3>
+
+<div class="diagram-wrap">
+<svg viewBox="0 0 780 440" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#1f3a5f"/></marker>
+  <marker id="a5r" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b5482a"/></marker>
+</defs>
+<g font-family="sans-serif" font-size="11">
+<rect x="20" y="20" width="160" height="50" rx="7" fill="#eef3fa" stroke="#1f3a5f"/><text x="100" y="40" text-anchor="middle" font-weight="700">Register</text><text x="100" y="56" text-anchor="middle" font-size="8.8">Argon2 hash password</text>
+
+<rect x="230" y="20" width="160" height="50" rx="7" fill="#eef3fa" stroke="#1f3a5f"/><text x="310" y="40" text-anchor="middle" font-weight="700">Login</text><text x="310" y="56" text-anchor="middle" font-size="8.8">verify password (generic error)</text>
+
+<line x1="180" y1="45" x2="222" y2="45" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a5)"/>
+<line x1="310" y1="70" x2="310" y2="100" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a5)"/>
+
+<rect x="110" y="104" width="200" height="56" rx="7" fill="#fde9d9" stroke="#b5482a"/>
+<text x="210" y="122" text-anchor="middle" font-weight="700" fill="#7a3416">Access Token</text>
+<text x="210" y="136" text-anchor="middle" font-size="8.8" fill="#5a3015">JWT, signed, 15 min, in-memory (ref)</text>
+<text x="210" y="150" text-anchor="middle" font-size="8.8" fill="#5a3015">never written to localStorage</text>
+
+<rect x="440" y="104" width="220" height="56" rx="7" fill="#eaf7ee" stroke="#2f7d4f"/>
+<text x="550" y="122" text-anchor="middle" font-weight="700" fill="#1d6b3b">Refresh Token</text>
+<text x="550" y="136" text-anchor="middle" font-size="8.8" fill="#214f30">opaque random value, 30 days,</text>
+<text x="550" y="150" text-anchor="middle" font-size="8.8" fill="#214f30">httpOnly cookie, checked against DB</text>
+
+<line x1="390" y1="45" x2="440" y2="104" stroke="#1f3a5f" stroke-width="1.4" marker-end="url(#a5)"/>
+<text x="400" y="80" font-size="8.6">issues</text>
+
+<line x1="210" y1="160" x2="210" y2="196" stroke="#1f3a5f" stroke-width="1.6" marker-end="url(#a5)"/>
+<rect x="60" y="200" width="300" height="50" rx="7" fill="#f4f6f8" stroke="#c7cedb"/>
+<text x="210" y="220" text-anchor="middle" font-weight="700">Every request</text>
+<text x="210" y="236" text-anchor="middle" font-size="8.8">JwtAuthFilter verifies signature → SecurityContext</text>
+
+<line x1="550" y1="160" x2="550" y2="196" stroke="#2f7d4f" stroke-width="1.6" marker-end="url(#a5)"/>
+<rect x="430" y="200" width="240" height="50" rx="7" fill="#f4f6f8" stroke="#c7cedb"/>
+<text x="550" y="218" text-anchor="middle" font-weight="700">On access-token expiry (15m)</text>
+<text x="550" y="234" text-anchor="middle" font-size="8.8">POST /access_token/refresh (cookie rides along)</text>
+
+<line x1="430" y1="225" x2="362" y2="225" stroke="#1f3a5f" stroke-width="1.4" marker-end="url(#a5)"/>
+
+<rect x="130" y="270" width="520" height="70" rx="7" fill="#eef3fa" stroke="#1f3a5f"/>
+<text x="390" y="290" text-anchor="middle" font-weight="700">AuthService.refresh — validate &amp; ROTATE</text>
+<text x="390" y="306" text-anchor="middle" font-size="8.8">old token revoked; a brand-new access+refresh pair issued, same "family" id</text>
+<text x="390" y="322" text-anchor="middle" font-size="8.8">re-checks the account is still active (a ban takes effect on next refresh)</text>
+
+<line x1="390" y1="340" x2="390" y2="366" stroke="#b5482a" stroke-width="1.6" marker-end="url(#a5r)"/>
+<rect x="190" y="370" width="400" height="44" rx="7" fill="#fbf3ef" stroke="#b5482a"/>
+<text x="390" y="388" text-anchor="middle" font-weight="700" fill="#7a2f1a">If the SAME refresh token is ever reused</text>
+<text x="390" y="402" text-anchor="middle" font-size="8.8" fill="#7a2f1a">→ treated as theft — the whole token family is revoked immediately</text>
+
+<rect x="620" y="270" width="150" height="70" rx="7" fill="#fde9d9" stroke="#b5482a"/>
+<text x="695" y="292" text-anchor="middle" font-weight="700" fill="#7a3416">Logout</text>
+<text x="695" y="308" text-anchor="middle" font-size="8.6" fill="#5a3015">revokes this family,</text>
+<text x="695" y="322" text-anchor="middle" font-size="8.6" fill="#5a3015">clears the cookie.</text>
+<text x="695" y="336" text-anchor="middle" font-size="8.2" fill="#5a3015" font-style="italic">(access token still</text>
+<line x1="590" y1="296" x2="618" y2="296" stroke="#1f3a5f" stroke-width="1.4" marker-end="url(#a5)"/>
+</g>
+<text x="695" y="350" text-anchor="middle" font-family="sans-serif" font-size="8.2" font-style="italic" fill="#5a3015">valid until its own 15min TTL)</text>
+</svg>
+<div class="diagram-caption">Fig. 5 — Token lifecycle: two tokens with two different jobs, rotated and revocable independently of each other.</div>
+</div>
+
+<h4>Registration — Argon2 password hashing</h4>
+<pre>// SecurityConfig.java:27-30
+@Bean
+public PasswordEncoder passwordEncoder() {
+    return new Argon2PasswordEncoder(16, 32, 1, 19456, 2); // tuned for ~100-200ms
+}</pre>
+<p>Deliberately slow and memory-hungry (16-byte salt, 32-byte hash, parallelism 1, ~19MB memory, 2 iterations) — imperceptible for one real login, but makes brute-forcing a stolen hash table prohibitively slow, unlike a fast hash like SHA-256. Call site: <span class="cite">AuthService.java:59</span> — <span class="mono">user.setPasswordHash(encoder.encode(rawPassword))</span>.</p>
+
+<h4>Login — two tokens, two jobs</h4>
+<p><span class="cite">AuthService.login (AuthService.java:69)</span> returns the exact same generic "invalid credentials" message whether the username doesn't exist <em>or</em> the password is wrong, and checks the account's active/banned status only <strong>after</strong> verifying the password — both deliberate, to avoid leaking account information to a guesser without the right password.</p>
+<table>
+<tr><th></th><th>Access token</th><th>Refresh token</th></tr>
+<tr><td>What it is</td><td>Signed JWT</td><td>Opaque random value — not a JWT</td></tr>
+<tr><td>Lifetime</td><td>15 minutes</td><td>30 days</td></tr>
+<tr><td>Verified how</td><td>Self-contained signature check, no DB lookup</td><td>SHA-256 hash looked up against a DB row on every use</td></tr>
+<tr><td>Where it lives</td><td>In-memory in the frontend, never persisted</td><td>An httpOnly cookie</td></tr>
+<tr><td>Why</td><td>Fast to verify, short-lived so theft is briefly useful at worst</td><td>Long-lived and powerful, so never exposed to JavaScript</td></tr>
+</table>
+<p>A JWT's only claims are <span class="mono">sub</span> (user UUID) and standard <span class="mono">iat</span>/<span class="mono">exp</span> — no roles embedded. Authorization elsewhere (e.g. "is this a site admin?") re-queries the database, never trusts claims baked into the token.</p>
+
+<h4>Every authenticated request — <span class="mono">JwtAuthFilter</span></h4>
+<p>Spring Security works as a <strong>filter chain</strong> — before a request reaches a controller, it passes through filters assembled in <span class="cite">SecurityConfig.filterChain (SecurityConfig.java:52)</span>. This project's own filter is spliced in explicitly: <span class="mono">.addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)</span> <span class="cite">(SecurityConfig.java:86)</span>. On every request, <span class="cite">JwtAuthFilter.java</span> checks for <span class="mono">Authorization: Bearer &lt;token&gt;</span>; if valid, it installs the user's UUID into Spring Security's <span class="mono">SecurityContext</span> — a per-request holder any later code reads via <span class="mono">@AuthenticationPrincipal UUID userId</span>. If the token is missing/expired/tampered, the filter does nothing — rejection, if any, happens downstream when the route's authorization rule is checked. The whole mechanism is <strong>stateless</strong> (<span class="cite">SecurityConfig.java:57</span>) — nothing about "who's logged in" is remembered between requests; every request re-proves its identity from scratch.</p>
+
+<h4>Why 401, not Spring Security's default 403</h4>
+<pre>// SecurityConfig.java:58-62
+// Spring Security's default anonymous-authentication + access-denied handling returns 403 for a
+// missing/invalid token on an authenticated-only route; a bearer-token API should return 401 there
+// instead (403 is reserved for an authenticated principal lacking permission).
+.exceptionHandling(ex -> ex.authenticationEntryPoint(new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))</pre>
+<p>Out of the box, Spring Security treats an unauthenticated caller as a harmless "anonymous" principal, so a denied route surfaces through the <em>access-denied</em> path, which defaults to 403. This project overrides that so a missing/invalid token on a protected route returns 401 instead — reserving 403 for "you're logged in, but not allowed to do this specific thing."</p>
+
+<h4>CORS: <span class="mono">allowedOrigins</span> vs. <span class="mono">allowedHeaders</span> are two separate dials</h4>
+<pre>// SecurityConfig.java:35-50
+config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+config.setAllowCredentials(true);</pre>
+<p>Because the frontend (<span class="mono">localhost:5174</span>) and backend (<span class="mono">localhost:8081</span>) run on different origins, the browser sends an automatic <span class="mono">OPTIONS</span> preflight asking permission first. <span class="mono">allowedOrigins</span> controls which <em>sites</em> may call the API; <span class="mono">allowedHeaders</span> separately controls which <em>request headers</em> the real request may carry. These are independent — and this project hit a real bug because of it (see Section 3). <span class="mono">allowCredentials(true)</span> is also why <span class="mono">allowedOrigins</span> can never be a wildcard <span class="mono">"*"</span> — browsers reject that combination outright.</p>
+<!-- SECTION_2_PLACEHOLDER -->
+<h2>3. Key Design Decisions</h2>
+<p class="section-intro">A running log of places this project did something other than the simplest possible thing, in the order they came up. For each: what the naive approach would have been, what was actually done, and why — because the "why" is usually a real bug or a real constraint, not a stylistic preference.</p>
+
+<div class="decision">
+<div class="decision-title">1. Java records as request DTOs — and the null-vs-primitive gotcha they create</div>
+<p><span class="label">Simple option:</span> use <span class="mono">boolean</span> for a flag like "is this NSFW," the same as on any JPA entity.</p>
+<p><span class="label">What happened:</span> <span class="cite">CreatePostRequest.java</span> is a <span class="mono">record</span>. When Jackson deserializes JSON into a record, it calls the <strong>canonical constructor</strong> directly — there's no JavaBean-style "skip the setter if absent" step. An omitted JSON field becomes <span class="mono">null</span> passed into the constructor. Adding <span class="mono">boolean nsfw, boolean spoiler</span> as primitives broke <strong>almost every existing post-creation call in the whole regression suite</strong> the moment it shipped — every pre-existing script's JSON predates these fields, and Jackson crashed trying to unbox <span class="mono">null</span> into a primitive.</p>
+<div class="bug"><span class="label">The fix</span> — <span class="mono">Boolean</span> (boxed) fields plus a compact canonical constructor normalizing <span class="mono">null</span> to a default, right at construction:
+<pre>public record CreatePostRequest(..., Boolean nsfw, Boolean spoiler) {
+    public CreatePostRequest {
+        if (nsfw == null) nsfw = false;
+        if (spoiler == null) spoiler = false;
+    }
+}</pre></div>
+<p>This is exactly why the house style runs the <strong>full</strong> existing regression suite after every change, not just new checks — this was caught immediately because of that discipline. Any future primitive field added to an existing client-deserialized record needs the same boxed-type treatment.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">2. Why "my vote state" is a separate endpoint, not a field on <span class="mono">Post</span></div>
+<p><span class="label">Simple option:</span> add a <span class="mono">myVote</span> field to <span class="mono">Post</span>/<span class="mono">Comment</span>, populated on every fetch.</p>
+<p><span class="label">What happened:</span> <span class="mono">vote</span> already depends on <span class="mono">post</span>/<span class="mono">comment</span> (it must confirm a target exists before accepting a vote). ArchUnit's cycle-freedom rule forbids <span class="mono">post</span>/<span class="mono">comment</span> depending back — structurally, not just by convention.</p>
+<p><span class="label">The fix:</span> a dedicated endpoint living entirely in <span class="mono">vote</span> — <span class="cite">GET /api/vote/mine</span> — that the frontend calls as a second request, composed client-side. See Section 2 for the full ArchUnit walkthrough.</p>
+<p>This "entity needs viewer-specific context it doesn't carry" situation recurred twice more during the frontend build (comment reply trees; a community's membership/moderator/join-request status), both solved by attaching the context server-side (batched for lists) rather than a separate endpoint — because those modules don't have a boundary conflict the way <span class="mono">vote</span> does. Which pattern applies comes down entirely to whether a module-boundary cycle would result.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">3. Redis caching for the hot feed (and r/all specifically)</div>
+<p><span class="label">Simple option:</span> no cache — run the ranked query fresh every request, like a basic CRUD list endpoint.</p>
+<p><span class="label">What happened:</span> the most expensive, most-hit read in a Reddit-like app is page&nbsp;1 of <span class="mono">/hot</span>, anonymous — which, once a sitewide <span class="mono">r/all</span> pseudo-community was built, includes a query aggregating across <em>every</em> community. The project owner explicitly asked for this to be cached the way real Reddit's homepage actually is.</p>
+<p><span class="label">The fix:</span> a two-level cache in <span class="cite">FeedCacheService.java</span> — in-process Caffeine (5s TTL, fast, per-instance) backed by Redis (45s TTL, shared) — scoped to only page&nbsp;1 for an anonymous viewer (virtually all real traffic). It <strong>accepts staleness</strong> as a deliberate trade-off (a fresh vote doesn't invalidate early) and <strong>fails open</strong> (a Redis outage falls back to a DB read, since the endpoint worked without this cache before).</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">4. The CORS <span class="mono">allowedHeaders</span> gotcha — a 200 preflight doesn't mean the real request will succeed</div>
+<p><span class="label">Simple option:</span> assume a 200 preflight means the real request goes through.</p>
+<div class="bug"><span class="label">What happened:</span> submitting a post from the real browser failed with a raw <span class="mono">net::ERR_FAILED</span> — not even a response reaching application code — despite the <span class="mono">OPTIONS</span> preflight itself returning 200 and a direct <span class="mono">curl</span> POST working fine. The request used a custom <span class="mono">Idempotency-Key</span> header that didn't exist when CORS was first configured. <span class="mono">allowedOrigins</span> and <span class="mono">allowedHeaders</span> are two independent allowlists — a 200 preflight status says nothing about whether the specific headers the real request needs are actually listed in that preflight's <span class="mono">Access-Control-Allow-Headers</span> response value. The browser checks that value and blocks the real request client-side, silently.</div>
+<p><span class="label">The fix:</span> add <span class="mono">Idempotency-Key</span> to <span class="mono">allowedHeaders</span> <span class="cite">(SecurityConfig.java:45)</span>.</p>
+<p>The diagnostic technique is the real lesson: a targeted <span class="mono">curl -i -X OPTIONS</span> with an explicit <span class="mono">Access-Control-Request-Headers</span> value reveals the <em>actual</em> allowed-headers list — checking only the status code, or testing via <span class="mono">curl</span> POST (not subject to browser CORS at all), will not catch this.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">5. The idempotency-key pattern for post submission</div>
+<p><span class="label">Simple option:</span> insert a new row every time submit is called — a timed-out retry is the client's problem.</p>
+<p><span class="label">What happened:</span> a timed-out request that actually succeeded server-side, followed by a client retry, would otherwise create a duplicate post. The fix: a client-generated idempotency key (<span class="mono">crypto.randomUUID()</span>, once per form instance) sent as an <span class="mono">Idempotency-Key</span> header. <span class="cite">PostService.create</span> atomically <strong>claims</strong> that key in Redis (SETNX-style) <em>before</em> touching the database; a repeat key returns the already-created post instead of making a second one.</p>
+<p><span class="label">Worth knowing:</span> because the Redis claim lives outside the DB transaction, a failure partway through has to explicitly release the key in a <span class="mono">catch</span> block — otherwise a rollback leaves the key claimed with no post behind it, blocking a legitimate retry for 24 hours.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">6. Client-side validation stricter than the server's, for routing safety rather than fidelity</div>
+<p><span class="label">Simple option:</span> let the frontend accept whatever the backend accepts.</p>
+<p><span class="label">What happened:</span> a community's name becomes a literal URL route segment (<span class="mono">/r/{name}</span>) everywhere in the frontend. The backend only enforces length (3&ndash;32 chars, any character) — spaces or slashes would silently break routing and links client-side, though the server would never error.</p>
+<p><span class="label">The fix:</span> <span class="cite">CreateCommunity.tsx</span> enforces <span class="mono">^[A-Za-z0-9_]{3,21}$</span> before ever calling the API, with an inline comment noting this is a routing-safety guard, not a fidelity choice — the backend's own (looser) validation is untouched.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">7. Two real correctness bugs in the original outbox-worker build (Phase 2)</div>
+<p><span class="label">What happened, caught in the same phase it shipped:</span> the first version of the vote outbox worker had two real bugs: a vote <strong>switch</strong> (up → down) only ever applied a swing of &plusmn;1, when it should be a swing of 2; and an <strong>unvote</strong> event was hard-coded to a delta of 0, so removing a vote never reversed its effect on score at all. Both caught and fixed within the same phase.</p>
+<p>The fix is encoded in the payload shape itself — <span class="cite">VoteEventPayload.java</span> deliberately carries <em>both</em> the old and new direction, so the worker has enough information to compute a correct net delta for every case.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">8. <span class="mono">citext</span> and <span class="mono">ltree</span> columns need a specific, non-"obvious" Hibernate mapping</div>
+<p><span class="label">Simple option:</span> map an exotic Postgres column type with <span class="mono">@JdbcTypeCode(SqlTypes.OTHER)</span> on a plain <span class="mono">String</span> — the mapping that looks most "correct."</p>
+<div class="bug"><span class="label">What happened:</span> that mapping passed Hibernate's schema validation but failed on the first real <span class="mono">INSERT</span>, because <span class="mono">SqlTypes.OTHER</span> binds via <span class="mono">setObject(..., Types.OTHER)</span>, which pgjdbc sends over the wire as untyped binary framing — <span class="mono">operator does not exist: citext = bytea</span>.</div>
+<p><span class="label">The fix:</span> a plain <span class="mono">String</span> field, <strong>no</strong> <span class="mono">@JdbcTypeCode</span> at all, just <span class="mono">@Column(columnDefinition = "citext")</span> — Hibernate 7 consults <span class="mono">columnDefinition</span> for validation, and a plain <span class="mono">String</span> binds via <span class="mono">setString()</span> (text protocol), which Postgres accepts into a <span class="mono">citext</span> column via an implicit cast. <span class="mono">ltree</span> needed one more step (no implicit varchar→ltree cast exists): <span class="mono">@ColumnTransformer(write = "?::ltree")</span>. Full investigation: <span class="cite">docs/PHASE_1_BUILD_LOG.md §9.7&ndash;9.8</span>.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">9. Spring Security's default is 403 for a missing token, not 401 — and fixing that creates a second bug</div>
+<p><span class="label">What happened:</span> Spring Security's <span class="mono">AnonymousAuthenticationFilter</span> treats every unauthenticated caller as a harmless "anonymous" principal, so a denied route is rejected via the <em>access-denied</em> path, defaulting to 403. Overriding this with a custom entry point <span class="cite">(SecurityConfig.java:58-62)</span> fixes that — but exposed a <strong>second</strong>, self-inflicted bug: an unhandled exception on an unauthenticated request triggers the servlet container's internal forward to <span class="mono">/error</span>, which <strong>re-enters the same security filter chain as a second, unauthenticated request</strong> — and <span class="mono">.anyRequest().authenticated()</span> denies <em>that</em> one, hiding a real 500 behind a misleading 401.</p>
+<p><span class="label">The fix:</span> exempt the <span class="mono">ERROR</span> dispatch type from the authentication check <span class="cite">(SecurityConfig.java:64-69)</span>. Both bugs were found by actually hitting them live (a real <span class="mono">ArithmeticException</span> surfaced as a misleading 401), not by reading documentation more carefully.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">10. A placeholder permission bitmask becomes a real security bug if left unfixed</div>
+<p><span class="label">What happened:</span> Phase 1 left <span class="mono">CommunityModerator.OWNER_PERMISSIONS = Integer.MAX_VALUE</span> as a placeholder before a real bitmask system existed. Once Phase 3 built real, named permission bits, granting a regular moderator <span class="mono">Integer.MAX_VALUE</span> directly (instead of OR-ing together only the named bits) would make them indistinguishable from the literal owner for any "has every <span class="mono">OWNER_PERMISSIONS</span> bit" check — because any bit anyone adds in the future would automatically evaluate true for them, without anyone deciding to grant it.</p>
+<p><span class="label">The fix:</span> grant moderators the OR of only the currently-named constants, never the sentinel value itself.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">11. STOMP's <span class="mono">.wrap()</span> vs. the real inbound accessor — a protocol-layer footgun</div>
+<div class="bug"><span class="label">What happened:</span> <span class="mono">StompHeaderAccessor.wrap(message)</span> builds a <strong>new</strong> accessor object — mutating it does <strong>not</strong> propagate back into the actual message Spring threads through its pipeline. Using <span class="mono">.wrap()</span> in the chat module's STOMP interceptor silently dropped the authenticated principal on every frame <em>after</em> the initial <span class="mono">CONNECT</span>: a user could connect successfully, but every subsequent chat message arrived unauthenticated. Found only by testing a real send/receive path live — it compiles fine and causes no error, just quietly wrong behavior.</div>
+<p><span class="label">The fix:</span> <span class="mono">MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class)</span>, which returns the real, mutable accessor already attached to the message.</p>
+</div>
+
+<div class="decision">
+<div class="decision-title">12. Dependency coordinates that look right but don't resolve</div>
+<p><span class="label">What happened:</span> adding a rate-limiting library by guessing the "obviously latest" coordinates resolved fine in search but <strong>failed at build time</strong> — that artifact only ever published a <span class="mono">.pom</span> (a dependency aggregator) with no compiled classes behind it. Bucket4j splits its Redis integration by both JDK baseline and client library; the one that actually contains usable classes matches Spring Data Redis's default client.</p>
+<p>A dependency that resolves isn't the same guarantee as one that contains the code you need — worth an actual build attempt, not just a version-string guess, with any unfamiliar library.</p>
+</div>
+<!-- SECTION_3_PLACEHOLDER -->
+<h2>4. Feature Report</h2>
+<p class="section-intro">The full build history, in order (see <span class="mono">git log --oneline --reverse</span>). A pattern recurs across almost every phase: <strong>the database column/table already existed, but zero Java code ever used it</strong> — the schema was designed up front for the whole project, phases ahead of the code that would use each piece. Checking the migrations folder first for an already-existing-but-unused column is a genuinely useful habit this project teaches.</p>
+
+<div class="feature"><h4>Backend Phase 1 — project skeleton, auth, communities, posts, comments <span class="commit">fa1ff8f, 663601e, daec834</span></h4>
+<p><strong>Problem solved:</strong> nothing existed yet — register/login/refresh, create/join/leave a community, submit a post, reply to a comment (depth 10 cap).</p>
+<p><strong>Required:</strong> the full initial schema (24 tables), the <span class="mono">auth/community/post/comment</span> modules, the JWT filter chain, the <span class="mono">ModuleBoundaryTest</span> ArchUnit rule.</p>
+<p><strong>Real bugs:</strong> Spring Security's default 403 instead of 401; a follow-up masked-500 bug from fixing that; <span class="mono">citext</span>/<span class="mono">ltree</span> Hibernate mapping gotchas; ArchUnit caught a real circular dependency (<span class="mono">SecurityConfig</span> moved from <span class="mono">common</span> into <span class="mono">auth</span>); a hardening pass found 15 more issues including a duplicate-post race in the idempotency logic. Full detail: <span class="cite">docs/PHASE_1_BUILD_LOG.md</span>.</p>
+</div>
+
+<div class="feature"><h4>Backend Phase 2 — voting, karma, feed ranking <span class="commit">0fe2334, 59cfd02</span></h4>
+<p><strong>Problem solved:</strong> posts/comments existed but nothing could be voted on; no <span class="mono">/hot</span>, <span class="mono">/top</span>, <span class="mono">/rising</span>, <span class="mono">/controversial</span>.</p>
+<p><strong>Required:</strong> the <span class="mono">vote</span> module (outbox pattern — see Section 2), a <span class="mono">job</span> package, precomputed rank columns so feed reads stay plain indexed queries.</p>
+<p><strong>Real bugs:</strong> two correctness bugs in the first outbox build (vote-switch swing, unvote delta — see Section 3 #7); a code-review pass found 15 more, including new posts starting with no <span class="mono">hot_rank</span> at all, a TOCTOU double-count race, and a reusable pagination cursor that silently produced wrong pages across different sorts.</p>
+</div>
+
+<div class="feature"><h4>Backend Phase 3 — moderation, automod, search, bans <span class="commit">2ddf584, 0c80ff2</span></h4>
+<p><strong>Problem solved:</strong> no way to report content, no moderator tooling, no automated filtering, no bans, no search.</p>
+<p><strong>Required:</strong> the <span class="mono">moderation</span> module, a real bitmask permission system (replacing Phase 1's placeholder — see Section 3 #10), automod rules attributed to a seeded bot account, a site-admin role, <span class="mono">tsvector</span> search, a Caffeine+Redis cache for <span class="mono">/hot</span>'s first page.</p>
+<p><strong>Real bugs:</strong> <span class="mono">reports</span>/<span class="mono">moderation_actions</span> had been declared <span class="mono">PARTITION BY RANGE</span> since Phase 1 with zero partitions ever created — this is the first phase to write to either, so every insert would have failed; a follow-up review found 14 more, including cross-community IDORs and an unbounded regex evaluation vulnerable to ReDoS.</p>
+</div>
+
+<div class="feature"><h4>Backend Phase 4 — notifications, messaging, media, engagement, account settings <span class="commit">272a035</span></h4>
+<p><strong>Problem solved:</strong> no notifications, no messaging, no media uploads, no save/hide, no account deletion.</p>
+<p><strong>Required:</strong> four new modules (<span class="mono">notify</span>, a later-replaced <span class="mono">message</span> module, <span class="mono">engagement</span>, <span class="mono">media</span>), the shared <span class="mono">OutboxWriter</span>, a dedicated <span class="mono">NotificationOutboxWorker</span>.</p>
+<p><strong>Real bugs:</strong> all 15 code-review findings from the initial build, including missing media ownership/kind validation, no upload size enforcement, and the same partitioned-but-zero-partitions bug, this time on <span class="mono">notifications</span>. Also: <span class="mono">docker-compose.yml</span> had to swap MinIO for <span class="mono">adobe/s3mock</span> after MinIO's Docker Hub image started requiring auth to pull.</p>
+</div>
+
+<div class="feature"><h4>Chat replaces classic Private Messages <span class="commit">d59afda</span></h4>
+<p><strong>Problem solved:</strong> real Reddit has been retiring store-and-forward Private Messages in favor of real-time Chat; Phase 4's <span class="mono">message</span> module was deliberately torn out and replaced.</p>
+<p><strong>Required:</strong> the <span class="mono">chat</span> module — STOMP over WebSocket, authenticated at the <span class="mono">CONNECT</span> frame (see Section 1).</p>
+<p><strong>Real bug:</strong> the <span class="mono">StompHeaderAccessor.wrap()</span> footgun — see Section 3 #11.</p>
+</div>
+
+<div class="feature"><h4>Flair (post flair and user flair) <span class="commit">1de54d3</span></h4>
+<p><strong>Problem solved:</strong> the <span class="mono">flairs</span> table existed since Phase 1's very first migration with zero Java code touching it.</p>
+<p><strong>Required:</strong> mod-managed flair definitions per community, post flair (validated at submission, attached via one batched query — not N+1), user flair (self-assignable).</p>
+</div>
+
+<h3>Backend feature-gap backlog, items 1&ndash;6 (shipped before the frontend phase)</h3>
+<p>A dedicated audit — comparing this app against real reddit.com feature-by-feature — found 21 more gaps. Six shipped:</p>
+<div class="feature"><h4>1. Pin/lock a post <span class="commit">8fc958b</span></h4><p><span class="mono">Post.pinned</span>/<span class="mono">locked</span> existed since Phase 1 with no code calling them. Pinned posts deliberately don't fold into <span class="mono">/new</span>/<span class="mono">/hot</span>'s own sort order — doing so would require rewriting proven keyset pagination for a cosmetic benefit — so pinned posts get their own small <span class="mono">GET /r/{name}/pinned</span> list instead.</p></div>
+<div class="feature"><h4>2. Community rules sidebar <span class="commit">6160c72</span></h4><p><span class="mono">communities.rules</span> (JSONB) existed since Phase 1, unused. A mod-only whole-list-replace write endpoint — not index-addressed CRUD, since a short rules list is edited as one unit in practice.</p></div>
+<div class="feature"><h4>3. Per-notification-type mute preferences <span class="commit">f3e340b</span></h4><p>Could only mute all notifications or none before. Enforced in <span class="mono">NotificationOutboxWorker</span> — the single chokepoint every notification type already passes through — rather than in each of the several places that produce a notification.</p></div>
+<div class="feature"><h4>4. Restricted/private communities <span class="commit">f0f55c2</span></h4><p><span class="mono">communities.type</span> had allowed these values since Phase 1, but every community was hardcoded public. The single feature that touched the most already-proven call sites in the whole backlog (every post/comment read and write endpoint needed a new access-gate check).</p></div>
+<div class="feature"><h4>5. Community discovery/browse <span class="commit">4fe5d0b</span></h4><p>No way to find a community without already knowing its exact name. The <span class="mono">pg_trgm</span> trigram index for name search existed since Phase 1, unused.</p></div>
+<div class="feature"><h4>6. Comment sort options <span class="commit">431f4aa</span></h4><p>Comments only ever came back in one fixed order. Verified with real hand-computed Wilson-confidence-score arithmetic — not guessed vote counts (an early attempt with plausible-sounding numbers failed twice before the real math worked).</p></div>
+
+<h3>Frontend phase — F1 through F6 (shipped)</h3>
+<p>No frontend existed before this phase. Each followed the same plan &rarr; build &rarr; verify &rarr; explicit-go-ahead discipline, verified through a live browser instead of curl scripts.</p>
+<div class="feature"><h4>F1 &mdash; Project scaffold + global shell <span class="commit">e02218d</span></h4><p>Vite+React+TS SPA, nav shell, in-memory access token with silent refresh, Login/Register. <strong>Found a real gap:</strong> no logout endpoint existed at all — added <span class="mono">POST /api/v1/logout</span>.</p></div>
+<div class="feature"><h4>F2 &mdash; Home feed <span class="commit">7fcb931</span></h4><p>Post cards, vote arrows, sort tabs, infinite scroll. <strong>Found a real gap:</strong> no sitewide feed existed. Built <span class="mono">r/all</span> as a real pseudo-community (the same convention reddit.com itself uses), with Redis caching.</p></div>
+<div class="feature"><h4>F3 &mdash; Post detail + comments <span class="commit">46f89d1</span></h4><p>Nested comment tree, sort dropdown, reply box. <strong>Found the biggest gap of the frontend phase:</strong> there was no way to ever read a comment's replies — once posted, a reply became permanently invisible to every read endpoint. Also fixed a bug where removed root comments were excluded entirely, which would have orphaned their reply subtrees.</p></div>
+<div class="feature"><h4>F4 &mdash; Community page <span class="commit">575bef2</span></h4><p>About/rules sidebar, join/leave, pinned posts. <strong>Found a real gap:</strong> <span class="mono">GET /r/{name}/about</span> had no concept of the viewer, so the frontend couldn't render Join vs. Joined vs. Request Pending.</p></div>
+<div class="feature"><h4>F5 &mdash; Community discovery <span class="commit">6a2c6a6</span></h4><p>Browse/search page, working nav-bar search. <strong>Caught an N+1 risk during planning, before writing code</strong> — F4's viewer-context lookup would have meant up to 75 queries per browse page if reused in a loop; batched it first.</p></div>
+<div class="feature"><h4>F6 &mdash; Create post / create community <span class="commit">cb6ff76</span></h4><p>The first in-app way to create anything — text/link/image+video posts via presigned upload, flair, NSFW/spoiler, community creation. <strong>Found two real bugs</strong> — the records-and-primitives crash and the CORS header gap — both detailed in Section 3 (#1 and #4), the most instructive bugs of the whole frontend phase.</p></div>
+
+<h3>What's next</h3>
+<p><strong>F7 — User profile page</strong> (overview/posts/comments tabs, karma) is next, followed by F8 (moderation dashboard), F9 (notifications inbox), F10 (chat UI), F11 (settings).</p>
+
+<h3>What's intentionally parked — backend features 7 through 20</h3>
+<p>Paused until the frontend phase (F1&ndash;F11) completes: sitewide search; <span class="mono">/api/morechildren</span> + real comment pagination; rate limiting (<span class="mono">bucket4j</span> already in <span class="mono">pom.xml</span>, unused); follow-a-user; gallery posts; avatar upload; link preview/OG-image fetching (flagged as needing SSRF-safe fetching when built); data export (GDPR); polls; trophies; wiki pages; multireddits; community chat rooms; live threads.</p>
+
+<h3>Permanently out of scope (an explicit decision, not an oversight)</h3>
+<ul>
+  <li><strong>Email verification, password reset, email notifications</strong> — all three need a real email service this project doesn't have; the owner chose to wait for a real Phase 5 rather than build a stub/logged-token workaround.</li>
+  <li><strong>Awards/coins, advertising, developer OAuth platform</strong> — all three conflict with this project's $0/month, non-commercial premise.</li>
+</ul>
+<h3>Deferred, not skipped</h3>
+<ul>
+  <li><strong>Push notifications</strong> — no mobile app exists in this project to register a device token against.</li>
+  <li><strong>2FA</strong> — deferred by owner decision, to be revisited later.</li>
+</ul>
+<!-- SECTION_4_PLACEHOLDER -->
+<h2>5. Glossary for Self-Study</h2>
+<p class="section-intro">Every concept used in this codebase beyond basic CRUD, each with a plain-English explanation and a pointer to real use in this repo. Read the explanation, then go read the cited file.</p>
+
+<div class="glossary-term"><span class="term">ArchUnit</span> — a testing library for writing architecture rules as ordinary JUnit tests, statically scanning compiled classes for structural violations ("no cycles between these packages"). A violation fails the build like a broken unit test. <span class="cite">ModuleBoundaryTest.java</span>; see Section 2.</div>
+
+<div class="glossary-term"><span class="term">Modular monolith</span> — a single deployable whose internal code is split into package-per-feature modules with an enforced rule that modules only call each other through service classes, never through another module's repository. See Section 2.</div>
+
+<div class="glossary-term"><span class="term">Spring Security filter chain</span> — before a request reaches a controller, it passes through a stack of servlet filters checking things like "is there a valid token," "does CORS allow this." Assembled in <span class="cite">SecurityConfig.filterChain (SecurityConfig.java:52)</span>, with this project's own filter spliced into a specific position (line 86).</div>
+
+<div class="glossary-term"><span class="term">SecurityContext / Authentication</span> — a per-request holder for "who is this request authenticated as." Populated in <span class="cite">JwtAuthFilter.java</span> via <span class="mono">SecurityContextHolder.getContext().setAuthentication(...)</span>, read back anywhere via <span class="mono">@AuthenticationPrincipal UUID userId</span>.</div>
+
+<div class="glossary-term"><span class="term">Stateless session</span> (<span class="mono">SessionCreationPolicy.STATELESS</span>) — unlike a traditional session-cookie app, every request carries its own proof of identity and is re-verified from scratch; nothing is remembered server-side between requests. <span class="cite">SecurityConfig.java:57</span>.</div>
+
+<div class="glossary-term"><span class="term">Argon2id</span> — a deliberately slow, memory-hard password-hashing algorithm, tuned so one real hash takes ~100&ndash;200ms but brute-forcing billions of guesses against a stolen hash table becomes prohibitively expensive. <span class="cite">SecurityConfig.java:27-30</span>.</div>
+
+<div class="glossary-term"><span class="term">JWT access token vs. refresh token</span> — two tokens, two jobs: a self-contained signed JWT, fast to verify, short-lived (15 min); and an opaque random value checked against the database on every use, long-lived (30 days), used only to silently obtain a new access token. See Section 2.</div>
+
+<div class="glossary-term"><span class="term">httpOnly cookie</span> — a cookie flag telling the browser to never expose a value to page JavaScript, only send it with matching HTTP requests. This project's refresh token lives only here, so even an XSS bug couldn't read it. <span class="cite">AuthController.java</span>.</div>
+
+<div class="glossary-term"><span class="term">CORS preflight, allowedOrigins vs. allowedHeaders</span> — a browser calling a different-origin API first sends an automatic <span class="mono">OPTIONS</span> preflight. <span class="mono">allowedOrigins</span> controls which sites may call the API; <span class="mono">allowedHeaders</span> separately controls which request headers the real request may carry — a real source of a production bug here (Section 3, #4).</div>
+
+<div class="glossary-term"><span class="term">Java records and compact canonical constructors</span> — a <span class="mono">record</span> is a concise, immutable data carrier with an auto-generated constructor. Jackson deserializes JSON into a record by calling that constructor directly — an absent field becomes <span class="mono">null</span>, not a quietly-kept default. A compact constructor (<span class="mono">public Foo { ... }</span>) intercepts and normalizes values before assignment. See Section 3, #1.</div>
+
+<div class="glossary-term"><span class="term">The Outbox pattern</span> — write the triggering fact and a small "this happened" event row in the <strong>same transaction</strong>, so neither can be lost without the other; a background worker later polls and processes events in batches. <span class="cite">OutboxWorker.java</span>; see Section 2.</div>
+
+<div class="glossary-term"><span class="term">@Scheduled and ShedLock</span> — <span class="mono">@Scheduled</span> runs a method on a timer, independent of any HTTP request. <span class="mono">@SchedulerLock</span> (ShedLock) wraps it in a database-backed lock so only one app instance's invocation actually executes a given tick. <span class="cite">SchedulingConfig.java</span>.</div>
+
+<div class="glossary-term"><span class="term">FOR UPDATE SKIP LOCKED</span> — a SQL clause for safely letting multiple workers grab rows from a queue-like table concurrently: locks the rows a query selects, and tells a concurrent query to simply skip any already-locked row rather than block or double-process it.</div>
+
+<div class="glossary-term"><span class="term">Presigned URL (direct-to-storage upload)</span> — the backend never receives a file's raw bytes; it asks the storage SDK to cryptographically sign a time-limited URL authorizing one specific PUT, and the client uploads directly using that URL. See Section 2.</div>
+
+<div class="glossary-term"><span class="term">@Transactional</span> — marks a method whose database operations should all succeed or all roll back together, as one atomic unit — the Spring equivalent of SQL's <span class="mono">BEGIN</span>/<span class="mono">COMMIT</span>/<span class="mono">ROLLBACK</span>.</div>
+
+<div class="glossary-term"><span class="term">Flyway migrations</span> — numbered, immutable SQL files applied once each, in order, instead of letting Hibernate auto-generate schema changes. <span class="cite">src/main/resources/db/migration/</span>.</div>
+
+<div class="glossary-term"><span class="term">Redis via Spring Data (StringRedisTemplate)</span> — a thin, low-level client for raw string values in Redis, used here by hand rather than via the <span class="mono">@Cacheable</span> annotation abstraction, so fail-open behavior and TTL layering can be controlled explicitly. <span class="cite">FeedCacheService.java</span>.</div>
+
+<div class="glossary-term"><span class="term">STOMP over WebSocket</span> — WebSocket upgrades an HTTP connection into a persistent, two-way connection; STOMP is a lightweight messaging sub-protocol on top, giving <span class="mono">@MessageMapping</span> methods a role analogous to <span class="mono">@RequestMapping</span> for REST. <span class="cite">ChatWebSocketConfig.java</span>.</div>
+
+<div class="glossary-term"><span class="term">Wilson score (confidence-interval ranking)</span> — a statistical formula for ranking by "upvote ratio" that accounts for sample size, so 2 upvotes/0 downvotes doesn't automatically outrank 50 up/49 down. <span class="cite">RankFormulas.java</span>.</div>
+
+<div class="glossary-term"><span class="term">UUIDv7</span> — a time-ordered UUID variant: sorts naturally by creation time and clusters better in a database index than a fully random UUIDv4, while staying globally unique. <span class="cite">UuidV7Generator.java</span>.</div>
+
+<div class="glossary-term"><span class="term">Keyset pagination (vs. OFFSET)</span> — instead of <span class="mono">LIMIT 25 OFFSET 500</span> (slower as the offset grows, can skip/duplicate rows if data changes between pages), a cursor carries the last-seen row's own sort key(s): <span class="mono">WHERE (created_at, id) &lt; (cursor) ORDER BY ... LIMIT 25</span>. <span class="cite">common/paging/Cursor.java</span>.</div>
+
+<div class="habit-box">
+<h4>The one habit worth taking away from this whole codebase</h4>
+<p>Across almost every phase of this project's history, the single most common type of real gap wasn't a logic bug — it was <strong>a database column or table that had existed since the very first migration, with zero application code ever using it</strong> (flair, pin/lock, community rules, the trigram search index, per-type notification preferences all started this way). The schema was designed up front for the whole project, well ahead of the code that would eventually use each piece of it. When asked to add a feature here, checking <span class="mono">src/main/resources/db/migration/</span> first for something that already exists but is unused is a genuinely useful habit — more often than not, the column is already there and the feature is "ship code," not "design schema."</p>
+</div>
+<!-- SECTION_5_PLACEHOLDER -->
+
+</body>
+</html>
