@@ -8,7 +8,11 @@
 # Prints PASS/FAIL with the real observed value for every check. Data is left in the dev database
 # afterward.
 #
-# Prereqs: docker compose stack up, app running on $BASE.
+# Prereqs: docker compose stack up, app running on $BASE. This script registers ~28 users in one run (the
+# Phase F pagination check alone needs 24) — it needs RATE_LIMIT_REGISTER_CAPACITY raised well above the
+# real default (3/hour) before running, the same way the full regression suite does; see
+# seed_and_verify_rate_limit.sh's own header for the inverse case (that one needs the real strict defaults).
+# Restart the app with e.g. RATE_LIMIT_REGISTER_CAPACITY=100000 before running this script alone.
 
 set -uo pipefail
 
@@ -60,6 +64,12 @@ req() {
 register() {
   local uname="fl${RUN}$1"
   req POST /api/v1/register "{\"username\":\"$uname\",\"email\":\"$uname@example.com\",\"password\":\"$PASSWORD\"}"
+  if [ "$HTTP_STATUS" != "200" ]; then
+    echo "FATAL: registration of $uname failed (HTTP $HTTP_STATUS) — $HTTP_BODY" >&2
+    echo "This script registers ~28 users in one run; if that's a 429, restart the app with" >&2
+    echo "RATE_LIMIT_REGISTER_CAPACITY raised well above the real default first (see this script's header)." >&2
+    exit 1
+  fi
   echo "$HTTP_BODY" | jq -r .accessToken
 }
 

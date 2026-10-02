@@ -82,6 +82,7 @@ export function Search() {
 
           <section className={styles.section}>
             <h2 className={styles.sectionTitle}>People</h2>
+            {users.actionError && <p className={styles.actionError}>{users.actionError}</p>}
             {users.loading ? (
               <div className={styles.state}>Loading…</div>
             ) : users.error ? (

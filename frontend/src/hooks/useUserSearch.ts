@@ -7,6 +7,7 @@ interface UseUserSearchResult {
   users: PublicProfile[];
   loading: boolean;
   error: string | null;
+  actionError: string | null;
   follow: (profile: PublicProfile) => void;
   unfollow: (profile: PublicProfile) => void;
 }
@@ -19,7 +20,7 @@ export function useUserSearch(query: string): UseUserSearchResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const requestId = useRef(0);
-  const { follow, unfollow } = useUserListActions(setUsers);
+  const { follow, unfollow, error: actionError } = useUserListActions(setUsers);
 
   useEffect(() => {
     if (!query.trim()) {
@@ -57,5 +58,5 @@ export function useUserSearch(query: string): UseUserSearchResult {
     })();
   }, [query, viewer]);
 
-  return { users, loading, error, follow, unfollow };
+  return { users, loading, error, actionError, follow, unfollow };
 }

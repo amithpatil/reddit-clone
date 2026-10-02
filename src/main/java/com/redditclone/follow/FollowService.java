@@ -30,6 +30,10 @@ public class FollowService {
     // app (GET /user/search has no pagination), so no shared kind constant existed to reuse.
     private static final String USER_KIND = "t2";
     private static final int PAGE_SIZE = 25;
+    // Caps POST /user/follow-status's request body — unlike every other listing in this app, that endpoint
+    // takes a client-supplied list with no natural page size, so without a cap it's an unbounded SQL IN
+    // clause with no rate-limit coverage.
+    private static final int MAX_BATCH_STATUS_SIZE = 100;
 
     private final FollowRepository follows;
     private final AuthService auth;
@@ -41,31 +45,38 @@ public class FollowService {
         this.outbox = outbox;
     }
 
+    // Returns whether this call actually changed the relationship (false for the idempotent already-
+    // following case) — read by FollowController so the frontend can reconcile its optimistic follower
+    // count against what really happened server-side, instead of always trusting its own pre-click guess
+    // at the prior isFollowing state (which can be wrong, e.g. if the best-effort status fetch failed).
     @Transactional
-    public void follow(UUID followerId, String targetUsername) {
+    public boolean follow(UUID followerId, String targetUsername) {
         UUID targetId = auth.findUserIdByUsername(targetUsername)
                 .orElseThrow(() -> new NotFoundException("no such user"));
         if (followerId.equals(targetId)) {
             throw new BadRequestException("cannot follow yourself");
         }
-        if (follows.existsByFollowerIdAndFolloweeId(followerId, targetId)) {
-            return; // idempotent, same convention as CommunityService.join/addMemberDirectly
+        // Atomic insert-if-absent rather than exists-check-then-save — see FollowRepository.insertIfAbsent.
+        if (follows.insertIfAbsent(followerId, targetId, Instant.now()) == 0) {
+            return false; // already following, idempotent
         }
-        follows.save(new Follow(followerId, targetId, Instant.now()));
         auth.adjustFollowerCount(targetId, 1);
         auth.adjustFollowingCount(followerId, 1);
         outbox.writeEvent("notification", Map.of(
                 "userId", targetId, "type", "new_follower", "source", Map.of("actorId", followerId)));
+        return true;
     }
 
     @Transactional
-    public void unfollow(UUID followerId, String targetUsername) {
+    public boolean unfollow(UUID followerId, String targetUsername) {
         UUID targetId = auth.findUserIdByUsername(targetUsername)
                 .orElseThrow(() -> new NotFoundException("no such user"));
         if (follows.deleteByFollowerIdAndFolloweeId(followerId, targetId) > 0) {
             auth.adjustFollowerCount(targetId, -1);
             auth.adjustFollowingCount(followerId, -1);
+            return true;
         }
+        return false;
     }
 
     // Single-item convenience, same role as CommunityService.attachViewerContext — read by
@@ -97,6 +108,9 @@ public class FollowService {
     public Map<String, Boolean> findFollowingStatusByUsernames(UUID viewerId, Collection<String> usernames) {
         if (usernames.isEmpty()) {
             return Map.of();
+        }
+        if (usernames.size() > MAX_BATCH_STATUS_SIZE) {
+            throw new BadRequestException("too many usernames in one batch (max " + MAX_BATCH_STATUS_SIZE + ")");
         }
         Map<String, UUID> idsByUsername = auth.findUserIdsByUsernames(new HashSet<>(usernames));
         Set<UUID> followingSet = findFolloweeIdsAmong(viewerId, idsByUsername.values());

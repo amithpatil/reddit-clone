@@ -50,18 +50,19 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("UPDATE User u SET u.karmaComment = u.karmaComment + :delta WHERE u.id = :id")
     void adjustKarmaComment(@Param("id") UUID id, @Param("delta") int delta);
 
-    // No clearAutomatically here, unlike adjustKarmaPost/adjustKarmaComment above: those protect against a
-    // stale already-loaded User entity elsewhere in the same transaction clobbering the bulk update on its
-    // own later save. follow.FollowService calls these immediately after follows.save()/delete() in the
-    // same transaction — clearAutomatically would wipe that not-yet-flushed Follow change before Hibernate
-    // ever writes it (merge() on a manually-assigned id doesn't flush immediately). Same no-clear shape as
-    // CommunityRepository.incrementSubscriberCount/decrementSubscriberCount, which bumps a counter right
-    // after saving a fresh Membership row in exactly the same way.
-    @Modifying
+    // flushAutomatically flushes any pending change (e.g. follow.FollowService.unfollow's pending Follow
+    // removal) to the DB before this UPDATE runs, so it's never silently lost; clearAutomatically then
+    // safely detaches whatever's left (e.g. the target User entity follow.FollowService's
+    // findUserIdByUsername loads but never mutates) afterward. Both together, rather than dropping
+    // clearAutomatically outright, give the same protection adjustKarmaPost/adjustKarmaComment have against
+    // a stale pre-loaded User being saved later in the same transaction and clobbering this bulk update,
+    // without also being able to silently discard a not-yet-flushed write the way a bare clearAutomatically
+    // would.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.followerCount = u.followerCount + :delta WHERE u.id = :id")
     void adjustFollowerCount(@Param("id") UUID id, @Param("delta") int delta);
 
-    @Modifying
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("UPDATE User u SET u.followingCount = u.followingCount + :delta WHERE u.id = :id")
     void adjustFollowingCount(@Param("id") UUID id, @Param("delta") int delta);
 }

@@ -9,6 +9,7 @@ interface UseUserConnectionsResult {
   loading: boolean;
   loadingMore: boolean;
   error: string | null;
+  actionError: string | null;
   hasMore: boolean;
   loadMore: () => void;
   follow: (profile: PublicProfile) => void;
@@ -27,7 +28,7 @@ export function useUserConnections(username: string, mode: ConnectionsMode): Use
   const [error, setError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const requestId = useRef(0);
-  const { follow, unfollow } = useUserListActions(setProfiles);
+  const { follow, unfollow, error: actionError } = useUserListActions(setProfiles);
 
   const fetchPage = mode === 'followers' ? fetchFollowers : fetchFollowing;
 
@@ -73,5 +74,5 @@ export function useUserConnections(username: string, mode: ConnectionsMode): Use
     })();
   }, [username, after, hasMore, loading, loadingMore, fetchPage]);
 
-  return { profiles, loading, loadingMore, error, hasMore, loadMore, follow, unfollow };
+  return { profiles, loading, loadingMore, error, actionError, hasMore, loadMore, follow, unfollow };
 }

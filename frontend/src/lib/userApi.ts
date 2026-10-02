@@ -42,12 +42,15 @@ export function fetchUserComments(username: string, after?: string | null): Prom
   return api.get(`/user/${username}/comments${query}`) as Promise<Listing<UserComment>>;
 }
 
-export function followUser(username: string): Promise<unknown> {
-  return api.post(`/user/${username}/follow`);
+// "changed" is false for the idempotent already-following/already-not-following case — callers use it to
+// decide whether to actually apply a follower-count delta, rather than assuming their own pre-click
+// isFollowing guess was right.
+export function followUser(username: string): Promise<{ changed: boolean }> {
+  return api.post(`/user/${username}/follow`) as Promise<{ changed: boolean }>;
 }
 
-export function unfollowUser(username: string): Promise<unknown> {
-  return api.del(`/user/${username}/follow`);
+export function unfollowUser(username: string): Promise<{ changed: boolean }> {
+  return api.del(`/user/${username}/follow`) as Promise<{ changed: boolean }>;
 }
 
 // Authenticated-only on the backend — only ever call this for a logged-in viewer.

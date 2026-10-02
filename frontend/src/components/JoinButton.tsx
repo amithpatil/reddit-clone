@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import type { Community } from '../types/community';
+import pillStyles from '../styles/PillButton.module.css';
 import styles from './JoinButton.module.css';
 
 interface JoinButtonProps {
@@ -15,7 +16,7 @@ export function JoinButton({ community, onJoin, onLeave, onRequestJoin }: JoinBu
 
   if (!user) {
     return (
-      <Link to="/login" className={`${styles.button} ${styles.join}`}>
+      <Link to="/login" className={`${pillStyles.button} ${styles.join}`}>
         Log in to Join
       </Link>
     );
@@ -23,7 +24,7 @@ export function JoinButton({ community, onJoin, onLeave, onRequestJoin }: JoinBu
 
   if (community.isMember) {
     return (
-      <button type="button" className={`${styles.button} ${styles.joined}`} onClick={onLeave}>
+      <button type="button" className={`${pillStyles.button} ${styles.joined}`} onClick={onLeave}>
         Joined
       </button>
     );
@@ -33,7 +34,7 @@ export function JoinButton({ community, onJoin, onLeave, onRequestJoin }: JoinBu
   // F6's submit-post flow — not this page's job).
   if (community.type !== 'private') {
     return (
-      <button type="button" className={`${styles.button} ${styles.join}`} onClick={onJoin}>
+      <button type="button" className={`${pillStyles.button} ${styles.join}`} onClick={onJoin}>
         Join
       </button>
     );
@@ -41,14 +42,14 @@ export function JoinButton({ community, onJoin, onLeave, onRequestJoin }: JoinBu
 
   if (community.joinRequestStatus === 'pending') {
     return (
-      <button type="button" className={`${styles.button} ${styles.pending}`} disabled>
+      <button type="button" className={`${pillStyles.button} ${styles.pending}`} disabled>
         Request Pending
       </button>
     );
   }
 
   return (
-    <button type="button" className={`${styles.button} ${styles.join}`} onClick={onRequestJoin}>
+    <button type="button" className={`${pillStyles.button} ${styles.join}`} onClick={onRequestJoin}>
       Request to Join
     </button>
   );

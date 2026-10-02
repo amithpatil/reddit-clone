@@ -27,14 +27,16 @@ public class FollowController {
     }
 
     // Authenticated by default (no SecurityConfig entry needed) — same as POST/DELETE /r/{name}/subscribe.
+    // "changed" lets the frontend reconcile its optimistic follower count against the real outcome rather
+    // than always trusting its own pre-click guess (see FollowService.follow's doc comment).
     @PostMapping("/user/{username}/follow")
-    public void follow(@AuthenticationPrincipal UUID userId, @PathVariable String username) {
-        follows.follow(userId, username);
+    public Map<String, Boolean> follow(@AuthenticationPrincipal UUID userId, @PathVariable String username) {
+        return Map.of("changed", follows.follow(userId, username));
     }
 
     @DeleteMapping("/user/{username}/follow")
-    public void unfollow(@AuthenticationPrincipal UUID userId, @PathVariable String username) {
-        follows.unfollow(userId, username);
+    public Map<String, Boolean> unfollow(@AuthenticationPrincipal UUID userId, @PathVariable String username) {
+        return Map.of("changed", follows.unfollow(userId, username));
     }
 
     // Authenticated-only (no SecurityConfig entry): the frontend only ever calls this for a logged-in

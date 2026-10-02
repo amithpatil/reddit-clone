@@ -28,6 +28,11 @@ export function useUserProfile(username: string): UseUserProfileResult {
   const [error, setError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const requestId = useRef(0);
+  // Blocks a new follow()/unfollow() call while one is still in flight for this profile — without this, a
+  // quick follow-then-unfollow double click can send both requests concurrently, let the server process
+  // them out of order (e.g. the fast unfollow arrives and no-ops before the slow follow has even landed,
+  // which then recreates the row afterward), and leave the UI's final state out of sync with the server's.
+  const actionInFlight = useRef(false);
 
   useEffect(() => {
     const id = ++requestId.current;
@@ -35,23 +40,20 @@ export function useUserProfile(username: string): UseUserProfileResult {
     setError(null);
     (async () => {
       try {
-        const p = await fetchPublicProfile(username);
-        if (id !== requestId.current) return;
         // isFollowing is always null straight off GET /user/{username}/about (auth has no dependency on
-        // follow) — resolved with a second, parallel call only when there's a logged-in viewer who isn't
-        // looking at their own profile, since that's the only case where the value is ever shown.
-        if (viewer && viewer.username !== username) {
-          try {
-            const status = await fetchFollowStatus(username);
-            if (id !== requestId.current) return;
-            setProfile({ ...p, isFollowing: status.isFollowing });
-            return;
-          } catch {
-            // Best-effort — the profile still renders with isFollowing left null (Follow button defaults
-            // to its "not following" state) rather than blocking the whole page on this one extra call.
-          }
-        }
-        setProfile(p);
+        // follow) — resolved via a second call run in parallel with the profile fetch (not after it: the
+        // status call only needs `username`, not the profile response), applied only when the viewer turns
+        // out not to be looking at their own profile — using the canonical username the profile fetch
+        // returns, not the raw route param, since usernames are case-insensitive (citext) and the two can
+        // differ only in case for the same account.
+        const shouldCheckStatus = viewer != null && viewer.username !== username;
+        const [p, status] = await Promise.all([
+          fetchPublicProfile(username),
+          shouldCheckStatus ? fetchFollowStatus(username).catch(() => null) : Promise.resolve(null),
+        ]);
+        if (id !== requestId.current) return;
+        const isFollowing = viewer && viewer.username !== p.username && status ? status.isFollowing : null;
+        setProfile({ ...p, isFollowing });
       } catch (err) {
         if (id !== requestId.current) return;
         setError(err instanceof ApiError && err.status === 404 ? 'No such user.' : 'Could not load this profile.');
@@ -62,28 +64,43 @@ export function useUserProfile(username: string): UseUserProfileResult {
   }, [username, viewer]);
 
   const follow = useCallback(async () => {
-    if (!profile) return;
+    if (!profile || actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionError(null);
     const snapshot = profile;
-    setProfile({ ...profile, isFollowing: true, followerCount: profile.followerCount + 1 });
+    // Only the button state flips optimistically — the count is adjusted once the response says a real
+    // change happened, not eagerly, since our own isFollowing guess (from a best-effort status fetch) can
+    // be wrong and the backend treats a redundant follow as a no-op rather than an error.
+    setProfile({ ...profile, isFollowing: true });
     try {
-      await followUser(username);
+      const { changed } = await followUser(username);
+      if (changed) {
+        setProfile((prev) => (prev ? { ...prev, followerCount: prev.followerCount + 1 } : prev));
+      }
     } catch (err) {
       setProfile(snapshot);
       setActionError(err instanceof ApiError ? err.message : 'Could not follow this user.');
+    } finally {
+      actionInFlight.current = false;
     }
   }, [profile, username]);
 
   const unfollow = useCallback(async () => {
-    if (!profile) return;
+    if (!profile || actionInFlight.current) return;
+    actionInFlight.current = true;
     setActionError(null);
     const snapshot = profile;
-    setProfile({ ...profile, isFollowing: false, followerCount: profile.followerCount - 1 });
+    setProfile({ ...profile, isFollowing: false });
     try {
-      await unfollowUser(username);
+      const { changed } = await unfollowUser(username);
+      if (changed) {
+        setProfile((prev) => (prev ? { ...prev, followerCount: prev.followerCount - 1 } : prev));
+      }
     } catch (err) {
       setProfile(snapshot);
       setActionError(err instanceof ApiError ? err.message : 'Could not unfollow this user.');
+    } finally {
+      actionInFlight.current = false;
     }
   }, [profile, username]);
 
