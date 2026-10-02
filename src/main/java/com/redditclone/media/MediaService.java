@@ -12,7 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -113,14 +115,41 @@ public class MediaService {
         if (mediaId == null) {
             throw new BadRequestException("mediaId is required");
         }
-        Media m = requireOwner(mediaId, authorId);
-        if (!"uploaded".equals(m.getProcessingStatus()) && !"ready".equals(m.getProcessingStatus())) {
-            throw new BadRequestException("media is not ready to attach to a post");
+        return requireOwnedAndUsableBatch(List.of(mediaId), authorId, expectedKind).get(0);
+    }
+
+    // Batched counterpart of requireOwnedAndUsable, for a gallery post's ordered list of images — one
+    // findAllById instead of N findById round trips, same four checks per item (exists, owned,
+    // ready/uploaded, type matches), same NotFoundException/ForbiddenException/BadRequestException shape.
+    // Returns results in the caller's own mediaIds order (not whatever order findAllById happens to
+    // return), since that order is the gallery's display order and must round-trip exactly.
+    public List<Media> requireOwnedAndUsableBatch(List<UUID> mediaIds, UUID authorId, String expectedKind) {
+        if (mediaIds == null || mediaIds.isEmpty()) {
+            throw new BadRequestException("mediaIds is required");
         }
-        if (!m.getMediaType().equals(expectedKind)) {
-            throw new BadRequestException("media type does not match post kind");
+        if (new HashSet<>(mediaIds).size() != mediaIds.size()) {
+            throw new BadRequestException("duplicate mediaId");
         }
-        return m;
+        Map<UUID, Media> byId = new HashMap<>();
+        media.findAllById(mediaIds).forEach(m -> byId.put(m.getId(), m));
+        List<Media> ordered = new ArrayList<>();
+        for (UUID id : mediaIds) {
+            Media m = byId.get(id);
+            if (m == null) {
+                throw new NotFoundException("media not found");
+            }
+            if (!m.getOwnerId().equals(authorId)) {
+                throw new ForbiddenException("not the owner of this media");
+            }
+            if (!"uploaded".equals(m.getProcessingStatus()) && !"ready".equals(m.getProcessingStatus())) {
+                throw new BadRequestException("media is not ready to attach to a post");
+            }
+            if (!m.getMediaType().equals(expectedKind)) {
+                throw new BadRequestException("media type does not match post kind");
+            }
+            ordered.add(m);
+        }
+        return ordered;
     }
 
     public MediaView toMediaView(Media m) {

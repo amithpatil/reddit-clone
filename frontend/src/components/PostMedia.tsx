@@ -30,6 +30,37 @@ function renderContent(post: Post, fullBody: boolean) {
     }
     return <div className={styles.mediaPlaceholder}>{post.kind === 'video' ? 'Video processing…' : 'Image processing…'}</div>;
   }
+  if (post.kind === 'gallery' && post.mediaItems && post.mediaItems.length > 0) {
+    if (!fullBody) {
+      // Feed card: first image only, same treatment as a single-image post, plus a "+N" badge when
+      // there's more than one — matches real Reddit's own feed-vs-detail gallery treatment.
+      const first = post.mediaItems[0];
+      return (
+        <div className={styles.galleryPreview}>
+          {first.processingStatus === 'ready' && first.thumbnailUrl ? (
+            <img className={styles.thumbnail} src={first.thumbnailUrl} alt="" />
+          ) : (
+            <div className={styles.mediaPlaceholder}>Image processing…</div>
+          )}
+          {post.mediaItems.length > 1 && <span className={styles.galleryCountBadge}>+{post.mediaItems.length - 1}</span>}
+        </div>
+      );
+    }
+    // Detail page: the full ordered strip, scrollable since a gallery can have up to 20 images.
+    return (
+      <div className={styles.galleryStrip}>
+        {post.mediaItems.map((item, index) =>
+          item.processingStatus === 'ready' && item.thumbnailUrl ? (
+            <img key={index} className={styles.galleryStripImage} src={item.thumbnailUrl} alt="" loading="lazy" />
+          ) : (
+            <div key={index} className={styles.galleryStripPlaceholder}>
+              Image processing…
+            </div>
+          ),
+        )}
+      </div>
+    );
+  }
   if (post.kind === 'link' && post.url) {
     return <div className={styles.domain}>({domainOf(post.url)})</div>;
   }

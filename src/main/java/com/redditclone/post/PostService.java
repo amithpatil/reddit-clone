@@ -39,6 +39,7 @@ import java.util.UUID;
 public class PostService {
 
     private final PostRepository posts;
+    private final PostMediaRepository postMedia;
     private final UuidV7Generator ids;
     private final StringRedisTemplate redis;
     private final Sanitizer sanitizer;
@@ -48,10 +49,12 @@ public class PostService {
     private final MediaService mediaService;
     private final int maxPinnedPosts;
 
-    public PostService(PostRepository posts, UuidV7Generator ids, StringRedisTemplate redis, Sanitizer sanitizer,
-                        NamedParameterJdbcTemplate jdbc, CommunityService communityService, AuthService authService,
-                        MediaService mediaService, @Value("${app.moderation.max-pinned-posts}") int maxPinnedPosts) {
+    public PostService(PostRepository posts, PostMediaRepository postMedia, UuidV7Generator ids,
+                        StringRedisTemplate redis, Sanitizer sanitizer, NamedParameterJdbcTemplate jdbc,
+                        CommunityService communityService, AuthService authService, MediaService mediaService,
+                        @Value("${app.moderation.max-pinned-posts}") int maxPinnedPosts) {
         this.posts = posts;
+        this.postMedia = postMedia;
         this.ids = ids;
         this.redis = redis;
         this.sanitizer = sanitizer;
@@ -88,6 +91,13 @@ public class PostService {
             if (req.mediaId() != null) {
                 validatedMedia = mediaService.requireOwnedAndUsable(req.mediaId(), authorId, req.kind());
             }
+            // Same principle as mediaId above, batched: a gallery's images are validated as a list (owned,
+            // ready, and every one actually an "image") in the caller's own chosen order, so that order can
+            // be written straight into post_media.position below with no extra re-sorting.
+            List<Media> validatedGalleryMedia = null;
+            if ("gallery".equals(req.kind())) {
+                validatedGalleryMedia = mediaService.requireOwnedAndUsableBatch(req.mediaIds(), authorId, "image");
+            }
             // Same never-trust-a-client-id principle as mediaId above, applied to flair — always optional
             // regardless of kind, so a null flairId is never rejected, only a present-but-invalid one.
             Flair validatedFlair = null;
@@ -120,6 +130,16 @@ public class PostService {
                 p.setRemoved(true);
             }
             posts.save(p);
+            if (validatedGalleryMedia != null) {
+                List<PostMedia> rows = new ArrayList<>();
+                for (short i = 0; i < validatedGalleryMedia.size(); i++) {
+                    rows.add(new PostMedia(p.getId(), validatedGalleryMedia.get(i).getId(), i));
+                }
+                postMedia.saveAll(rows);
+                // Reuse the rows requireOwnedAndUsableBatch already fetched instead of a second query a
+                // moment later via attachGalleryMedia() for rows that can't have changed since.
+                p.setMediaItems(validatedGalleryMedia.stream().map(mediaService::toMediaView).toList());
+            }
             if (validatedFlair != null) {
                 // Reuse the row requireFlairUsable already fetched instead of a second findAllById round
                 // trip a moment later via attachFlair() for a row that can't have changed since.
@@ -129,6 +149,9 @@ public class PostService {
                 // Reuse the row requireOwnedAndUsable already fetched instead of a second findAllById
                 // round trip a moment later via attachMedia() for a row that can't have changed since.
                 p.setMedia(mediaService.toMediaView(validatedMedia));
+                return attachCommunityName(attachAuthorUsername(p));
+            }
+            if (validatedGalleryMedia != null) {
                 return attachCommunityName(attachAuthorUsername(p));
             }
             return attachCommunityName(attachAuthorUsername(attachMedia(p)));
@@ -310,6 +333,57 @@ public class PostService {
         return p;
     }
 
+    // Same batched-never-N+1 shape as attachMedia above, over the post_media join table instead of a
+    // single FK column — only "gallery"-kind posts in the page ever have rows here. One query for every
+    // (post_id, media_id, position) row in the page, one batched mediaService.getMediaViews call across
+    // every media id gathered from them, then grouped back into each gallery post's mediaItems in position
+    // order (findByPostIdInOrderByPostIdAscPositionAsc already returns rows in that order).
+    private List<Post> attachGalleryMedia(List<Post> page) {
+        List<UUID> galleryPostIds = new ArrayList<>();
+        for (Post p : page) {
+            if ("gallery".equals(p.getKind())) {
+                galleryPostIds.add(p.getId());
+            }
+        }
+        if (galleryPostIds.isEmpty()) {
+            return page;
+        }
+        List<PostMedia> rows = postMedia.findByPostIdInOrderByPostIdAscPositionAsc(galleryPostIds);
+        Set<UUID> mediaIds = new HashSet<>();
+        for (PostMedia row : rows) {
+            mediaIds.add(row.getMediaId());
+        }
+        Map<UUID, MediaView> views = mediaService.getMediaViews(mediaIds);
+        Map<UUID, List<MediaView>> byPost = new HashMap<>();
+        for (PostMedia row : rows) {
+            byPost.computeIfAbsent(row.getPostId(), k -> new ArrayList<>()).add(views.get(row.getMediaId()));
+        }
+        for (Post p : page) {
+            if ("gallery".equals(p.getKind())) {
+                p.setMediaItems(byPost.getOrDefault(p.getId(), List.of()));
+            }
+        }
+        return page;
+    }
+
+    private Post attachGalleryMedia(Post p) {
+        if (!"gallery".equals(p.getKind())) {
+            return p;
+        }
+        List<PostMedia> rows = postMedia.findByPostIdInOrderByPostIdAscPositionAsc(List.of(p.getId()));
+        Set<UUID> mediaIds = new HashSet<>();
+        for (PostMedia row : rows) {
+            mediaIds.add(row.getMediaId());
+        }
+        Map<UUID, MediaView> views = mediaService.getMediaViews(mediaIds);
+        List<MediaView> items = new ArrayList<>();
+        for (PostMedia row : rows) {
+            items.add(views.get(row.getMediaId()));
+        }
+        p.setMediaItems(items);
+        return p;
+    }
+
     // Same batched-IN-query, never-N+1 shape as attachMedia above, via CommunityService.getFlairs.
     private List<Post> attachFlair(List<Post> page) {
         Set<UUID> flairIds = new HashSet<>();
@@ -384,11 +458,11 @@ public class PostService {
     }
 
     private List<Post> attachAll(List<Post> page) {
-        return attachCommunityName(attachAuthorUsername(attachFlair(attachMedia(page))));
+        return attachCommunityName(attachAuthorUsername(attachFlair(attachGalleryMedia(attachMedia(page)))));
     }
 
     private Post attachAll(Post p) {
-        return attachCommunityName(attachAuthorUsername(attachFlair(attachMedia(p))));
+        return attachCommunityName(attachAuthorUsername(attachFlair(attachGalleryMedia(attachMedia(p)))));
     }
 
     // ModerationController pushes the PERM_MANAGE_FLAIRS check down before calling this — no permission

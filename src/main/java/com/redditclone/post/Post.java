@@ -9,6 +9,7 @@ import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -35,7 +36,7 @@ public class Post {
     private String authorUsername;
 
     @Column(nullable = false)
-    private String kind; // text | link | image | video
+    private String kind; // text | link | image | video | gallery
 
     @Column(nullable = false)
     private String title;
@@ -52,6 +53,12 @@ public class Post {
     // path is automatically correct: media is attached before the listing is serialized and cached.
     @Transient
     private MediaView media;
+
+    // Populated by PostService.attachGalleryMedia() for kind="gallery" posts only — null for every other
+    // kind, same null-means-not-applicable convention as media/flair above. media/mediaId stay null for a
+    // gallery post; this is the only place its images live.
+    @Transient
+    private List<MediaView> mediaItems;
 
     @Column(name = "flair_id")
     private UUID flairId;
@@ -191,6 +198,14 @@ public class Post {
 
     public void setMedia(MediaView media) {
         this.media = media;
+    }
+
+    public List<MediaView> getMediaItems() {
+        return mediaItems;
+    }
+
+    public void setMediaItems(List<MediaView> mediaItems) {
+        this.mediaItems = mediaItems;
     }
 
     public UUID getFlairId() {

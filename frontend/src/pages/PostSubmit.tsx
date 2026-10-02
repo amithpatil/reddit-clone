@@ -3,13 +3,14 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { FlairPicker } from '../components/FlairPicker';
 import { useCommunitySearch } from '../hooks/useCommunitySearch';
+import { useGalleryUpload } from '../hooks/useGalleryUpload';
 import { useMediaUpload } from '../hooks/useMediaUpload';
 import { ApiError } from '../lib/apiClient';
 import { submitPost } from '../lib/postApi';
 import type { PostKind } from '../types/post';
 import styles from './PostSubmit.module.css';
 
-type Tab = 'text' | 'media' | 'link';
+type Tab = 'text' | 'media' | 'gallery' | 'link';
 
 export function PostSubmit() {
   const { user } = useAuth();
@@ -36,6 +37,7 @@ export function PostSubmit() {
   const idempotencyKeyRef = useRef(crypto.randomUUID());
 
   const media = useMediaUpload();
+  const gallery = useGalleryUpload();
 
   if (!user) {
     return (
@@ -97,6 +99,20 @@ export function PostSubmit() {
         setError('Enter a valid URL starting with http:// or https://.');
         return;
       }
+    } else if (tab === 'gallery') {
+      kind = 'gallery';
+      if (gallery.items.length < 2) {
+        setError('Add at least 2 images for a gallery.');
+        return;
+      }
+      if (gallery.items.some((i) => i.uploading)) {
+        setError('Please wait for the uploads to finish.');
+        return;
+      }
+      if (gallery.items.some((i) => i.error || !i.mediaId)) {
+        setError('Remove any images that failed to upload before posting.');
+        return;
+      }
     } else {
       if (!media.mediaId || !media.kind) {
         setError(media.uploading ? 'Please wait for the upload to finish.' : 'Choose an image or video to upload.');
@@ -115,6 +131,7 @@ export function PostSubmit() {
           body: kind === 'text' ? body.trim() : undefined,
           url: kind === 'link' ? url.trim() : undefined,
           mediaId: kind === 'image' || kind === 'video' ? media.mediaId! : undefined,
+          mediaIds: kind === 'gallery' ? gallery.items.map((i) => i.mediaId!) : undefined,
           flairId: flairId ?? undefined,
           nsfw,
           spoiler,
@@ -142,6 +159,9 @@ export function PostSubmit() {
           </button>
           <button type="button" className={`${styles.tab} ${tab === 'media' ? styles.tabActive : ''}`} onClick={() => setTab('media')}>
             Images &amp; Video
+          </button>
+          <button type="button" className={`${styles.tab} ${tab === 'gallery' ? styles.tabActive : ''}`} onClick={() => setTab('gallery')}>
+            Gallery
           </button>
           <button type="button" className={`${styles.tab} ${tab === 'link' ? styles.tabActive : ''}`} onClick={() => setTab('link')}>
             Link
@@ -207,6 +227,56 @@ export function PostSubmit() {
           </div>
         )}
 
+        {tab === 'gallery' && (
+          <div className={styles.field}>
+            <input
+              className={styles.fileInput}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              multiple
+              onChange={(e) => {
+                if (e.target.files && e.target.files.length > 0) gallery.addFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+            {gallery.error && <p className={styles.error}>{gallery.error}</p>}
+            {gallery.items.map((item, index) => (
+              <div key={item.id} className={styles.galleryRow}>
+                <img className={styles.galleryThumb} src={item.previewUrl} alt="" />
+                <div className={styles.galleryRowInfo}>
+                  <span>{index + 1}.</span>
+                  {item.uploading && <span className={styles.uploadStatus}>Uploading…</span>}
+                  {item.error && <span className={styles.error}>{item.error}</span>}
+                </div>
+                <div className={styles.galleryRowActions}>
+                  <button
+                    type="button"
+                    className={styles.galleryMoveButton}
+                    disabled={index === 0}
+                    onClick={() => gallery.moveItem(item.id, 'up')}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.galleryMoveButton}
+                    disabled={index === gallery.items.length - 1}
+                    onClick={() => gallery.moveItem(item.id, 'down')}
+                  >
+                    ↓
+                  </button>
+                  <button type="button" className={styles.galleryRemoveButton} onClick={() => gallery.removeItem(item.id)}>
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+            {gallery.items.length > 0 && gallery.items.length < 2 && (
+              <p className={styles.uploadStatus}>Add at least one more image.</p>
+            )}
+          </div>
+        )}
+
         <FlairPicker communityName={communityName} value={flairId} onChange={setFlairId} />
 
         <label className={styles.checkboxRow}>
@@ -218,7 +288,11 @@ export function PostSubmit() {
           Spoiler
         </label>
 
-        <button type="submit" className={styles.submit} disabled={submitting || media.uploading}>
+        <button
+          type="submit"
+          className={styles.submit}
+          disabled={submitting || media.uploading || gallery.items.some((i) => i.uploading)}
+        >
           {submitting ? 'Posting…' : 'Post'}
         </button>
       </form>

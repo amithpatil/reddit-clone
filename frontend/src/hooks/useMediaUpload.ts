@@ -1,13 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { completeUpload, requestUploadUrl, uploadFileDirectly } from '../lib/mediaApi';
-
-const MAX_IMAGE_BYTES = 20 * 1024 * 1024; // matches app.media.max-image-bytes' default
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // matches app.media.max-video-bytes' default
-
-const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
-// GIFs are converted server-side to a muted looping video — MediaService classifies them as mediaType
-// "video", not "image", so the post kind must match that, not the file's apparent image/* mime type.
-const VIDEO_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm', 'image/gif']);
+import { IMAGE_TYPES, MAX_IMAGE_BYTES, MAX_VIDEO_BYTES, VIDEO_TYPES } from '../lib/mediaValidation';
 
 interface UseMediaUploadResult {
   uploading: boolean;

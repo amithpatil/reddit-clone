@@ -7,6 +7,7 @@ export interface CreatePostRequest {
   body?: string;
   url?: string;
   mediaId?: string;
+  mediaIds?: string[];
   flairId?: string;
   nsfw?: boolean;
   spoiler?: boolean;

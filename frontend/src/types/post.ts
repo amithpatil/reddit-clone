@@ -16,7 +16,7 @@ export interface Flair {
   createdAt: string;
 }
 
-export type PostKind = 'text' | 'link' | 'image' | 'video';
+export type PostKind = 'text' | 'link' | 'image' | 'video' | 'gallery';
 
 export interface Post {
   id: string;
@@ -30,6 +30,9 @@ export interface Post {
   url: string | null;
   mediaId: string | null;
   media: MediaView | null;
+  // Only populated for kind="gallery" — null for every other kind, same as mediaId/media staying null for
+  // a gallery post. Ordered: index 0 is the first image in the gallery.
+  mediaItems: MediaView[] | null;
   flairId: string | null;
   flair: Flair | null;
   nsfw: boolean;
