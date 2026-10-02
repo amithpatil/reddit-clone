@@ -29,6 +29,10 @@ export function NavBar() {
         <Logo />
       </Link>
 
+      <Link to="/communities" className={styles.communitiesLink}>
+        Communities
+      </Link>
+
       <form className={styles.search} onSubmit={handleSearch}>
         <input
           className={styles.searchInput}

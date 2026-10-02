@@ -16,6 +16,18 @@
   align-items: center;
 }
 
+.communitiesLink {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.communitiesLink:hover {
+  color: var(--color-text);
+}
+
 .search {
   flex: 1;
   max-width: 600px;
