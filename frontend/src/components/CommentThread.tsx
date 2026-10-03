@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { decodeHtmlEntities } from '../lib/html';
 import { timeAgo } from '../lib/time';
 import type { CommentNode } from '../types/comment';
+import { OwnContentActions } from './OwnContentActions';
 import { ReplyBox } from './ReplyBox';
 import { VoteControl } from './VoteControl';
 import styles from './CommentThread.module.css';
@@ -15,15 +17,29 @@ interface CommentThreadProps {
   onVote: (commentId: string, dir: 1 | -1) => void;
   onReply: (parentId: string, body: string) => Promise<void>;
   onLoadMoreReplies: (parentId: string) => void;
+  onEdit: (commentId: string, body: string) => Promise<void>;
+  onDelete: (commentId: string) => Promise<void>;
+  // True when the whole post is a tombstone — the server rejects replies to a deleted post, so no Reply
+  // affordance is offered anywhere in its thread.
+  readOnly?: boolean;
 }
 
-export function CommentThread({ comment, onVote, onReply, onLoadMoreReplies }: CommentThreadProps) {
+export function CommentThread({ comment, onVote, onReply, onLoadMoreReplies, onEdit, onDelete, readOnly = false }: CommentThreadProps) {
+  const { user } = useAuth();
   const [replying, setReplying] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const handleReply = async (body: string) => {
     await onReply(comment.id, body);
     setReplying(false);
   };
+
+  const handleEdit = async (body: string) => {
+    await onEdit(comment.id, body);
+    setEditing(false);
+  };
+
+  const tombstoned = comment.deleted || comment.removed;
 
   return (
     <div>
@@ -40,13 +56,39 @@ export function CommentThread({ comment, onVote, onReply, onLoadMoreReplies }: C
             ) : (
               <span className={styles.author}>u/[deleted]</span>
             )}{' '}
-            <span className={styles.time}>· {timeAgo(comment.createdAt)}</span>
+            <span className={styles.time}>
+              · {timeAgo(comment.createdAt)}
+              {comment.editedAt && !comment.deleted && <> · edited</>}
+            </span>
           </div>
-          <p className={comment.removed ? `${styles.text} ${styles.textRemoved}` : styles.text}>{decodeHtmlEntities(comment.body)}</p>
-          {comment.depth < MAX_DEPTH && (
+          {editing ? (
+            <ReplyBox
+              placeholder="Edit your comment"
+              submitLabel="Save"
+              initialBody={comment.body}
+              onCancel={() => setEditing(false)}
+              onSubmit={handleEdit}
+            />
+          ) : (
+            <p className={tombstoned ? `${styles.text} ${styles.textRemoved}` : styles.text}>
+              {decodeHtmlEntities(comment.body)}
+            </p>
+          )}
+          {!readOnly && !comment.deleted && comment.depth < MAX_DEPTH && (
             <button type="button" className={styles.replyToggle} onClick={() => setReplying((r) => !r)}>
               Reply
             </button>
+          )}
+          {user && !editing && (
+            <OwnContentActions
+              viewerId={user.id}
+              authorId={comment.authorId}
+              removed={comment.removed}
+              deleted={comment.deleted}
+              canEdit
+              onEdit={() => setEditing(true)}
+              onDelete={() => onDelete(comment.id)}
+            />
           )}
           {replying && (
             <ReplyBox placeholder="What are your thoughts?" submitLabel="Reply" onCancel={() => setReplying(false)} onSubmit={handleReply} />
@@ -56,7 +98,16 @@ export function CommentThread({ comment, onVote, onReply, onLoadMoreReplies }: C
       {(comment.replies.length > 0 || comment.repliesAfter !== null) && (
         <div className={styles.replies}>
           {comment.replies.map((reply) => (
-            <CommentThread key={reply.id} comment={reply} onVote={onVote} onReply={onReply} onLoadMoreReplies={onLoadMoreReplies} />
+            <CommentThread
+              key={reply.id}
+              comment={reply}
+              onVote={onVote}
+              onReply={onReply}
+              onLoadMoreReplies={onLoadMoreReplies}
+              onEdit={onEdit}
+              onDelete={onDelete}
+              readOnly={readOnly}
+            />
           ))}
           {comment.repliesAfter !== null && (
             <button type="button" className={styles.loadMoreReplies} onClick={() => onLoadMoreReplies(comment.id)}>

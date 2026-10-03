@@ -7,13 +7,21 @@ import styles from './ReplyBox.module.css';
 interface ReplyBoxProps {
   placeholder?: string;
   submitLabel?: string;
+  // Seeds the textarea — used when this box edits existing content rather than starting a new reply.
+  initialBody?: string;
   onCancel?: () => void;
   onSubmit: (body: string) => Promise<void>;
 }
 
-export function ReplyBox({ placeholder = 'What are your thoughts?', submitLabel = 'Comment', onCancel, onSubmit }: ReplyBoxProps) {
+export function ReplyBox({
+  placeholder = 'What are your thoughts?',
+  submitLabel = 'Comment',
+  initialBody = '',
+  onCancel,
+  onSubmit,
+}: ReplyBoxProps) {
   const { user } = useAuth();
-  const [body, setBody] = useState('');
+  const [body, setBody] = useState(initialBody);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

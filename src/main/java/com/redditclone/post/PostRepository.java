@@ -20,7 +20,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // filter is skipped entirely rather than matching nothing.
     @Query("""
             SELECT p FROM Post p
-            WHERE p.communityId = :communityId AND p.removed = false
+            WHERE p.communityId = :communityId AND p.removed = false AND NOT p.deleted
               AND (p.createdAt < :cursorCreatedAt OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -46,7 +46,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // IS NULL special-casing needed.
     @Query("""
             SELECT p FROM Post p
-            WHERE p.removed = false
+            WHERE p.removed = false AND NOT p.deleted
               AND (p.createdAt < :cursorCreatedAt OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -72,7 +72,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // safe.
     @Query("""
             SELECT p FROM Post p
-            WHERE p.authorId = :authorId AND p.removed = false
+            WHERE p.authorId = :authorId AND p.removed = false AND NOT p.deleted
               AND (p.createdAt < :cursorCreatedAt OR (p.createdAt = :cursorCreatedAt AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -89,7 +89,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     @Query("""
             SELECT p FROM Post p
-            WHERE p.communityId = :communityId AND p.removed = false
+            WHERE p.communityId = :communityId AND p.removed = false AND NOT p.deleted
               AND (p.hotRank < :cursorRank OR (p.hotRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -104,7 +104,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
-            WHERE p.removed = false
+            WHERE p.removed = false AND NOT p.deleted
               AND (p.hotRank < :cursorRank OR (p.hotRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -120,7 +120,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     @Query("""
             SELECT p FROM Post p
-            WHERE p.communityId = :communityId AND p.removed = false AND p.createdAt >= :since
+            WHERE p.communityId = :communityId AND p.removed = false AND NOT p.deleted AND p.createdAt >= :since
               AND (p.score < :cursorScore OR (p.score = :cursorScore AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -136,7 +136,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
-            WHERE p.removed = false AND p.createdAt >= :since
+            WHERE p.removed = false AND NOT p.deleted AND p.createdAt >= :since
               AND (p.score < :cursorScore OR (p.score = :cursorScore AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -153,7 +153,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     @Query("""
             SELECT p FROM Post p
-            WHERE p.communityId = :communityId AND p.removed = false
+            WHERE p.communityId = :communityId AND p.removed = false AND NOT p.deleted
               AND (p.risingRank < :cursorRank OR (p.risingRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -168,7 +168,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
-            WHERE p.removed = false
+            WHERE p.removed = false AND NOT p.deleted
               AND (p.risingRank < :cursorRank OR (p.risingRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -184,7 +184,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     @Query("""
             SELECT p FROM Post p
-            WHERE p.communityId = :communityId AND p.removed = false
+            WHERE p.communityId = :communityId AND p.removed = false AND NOT p.deleted
               AND (p.controversialRank < :cursorRank OR (p.controversialRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -199,7 +199,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // Private-community exclusion: see findNewAllPage's comment for the full reasoning.
     @Query("""
             SELECT p FROM Post p
-            WHERE p.removed = false
+            WHERE p.removed = false AND NOT p.deleted
               AND (p.controversialRank < :cursorRank OR (p.controversialRank = :cursorRank AND p.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'post' AND h.targetId = p.id))
@@ -219,7 +219,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     // re-applies this ranking order, rather than fighting native-query-to-entity mapping for one endpoint.
     @Query(value = """
             SELECT id FROM posts
-            WHERE community_id = :communityId AND NOT removed
+            WHERE community_id = :communityId AND NOT removed AND NOT deleted
               AND search_vector @@ websearch_to_tsquery('english', :query)
             ORDER BY ts_rank(search_vector, websearch_to_tsquery('english', :query)) DESC
             LIMIT 25
@@ -238,7 +238,7 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
     @Query(value = """
             SELECT p.id FROM posts p
             JOIN communities c ON c.id = p.community_id
-            WHERE NOT p.removed
+            WHERE NOT p.removed AND NOT p.deleted
               AND p.search_vector @@ websearch_to_tsquery('english', :query)
               AND (c.type <> 'private'
                    OR EXISTS (SELECT 1 FROM memberships m WHERE m.user_id = :viewerId AND m.community_id = p.community_id)
@@ -250,5 +250,5 @@ public interface PostRepository extends JpaRepository<Post, UUID> {
 
     int countByCommunityIdAndPinnedTrue(UUID communityId);
 
-    List<Post> findByCommunityIdAndPinnedTrueAndRemovedFalseOrderByCreatedAtDesc(UUID communityId);
+    List<Post> findByCommunityIdAndPinnedTrueAndRemovedFalseAndDeletedFalseOrderByCreatedAtDesc(UUID communityId);
 }

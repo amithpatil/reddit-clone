@@ -250,7 +250,7 @@ public interface CommentRepository extends JpaRepository<Comment, UUID> {
     // edge case, not a new risk.
     @Query("""
             SELECT c FROM Comment c
-            WHERE c.authorId = :authorId AND c.removed = false
+            WHERE c.authorId = :authorId AND c.removed = false AND NOT c.deleted
               AND (c.createdAt < :cursorCreatedAt OR (c.createdAt = :cursorCreatedAt AND c.id < :cursorId))
               AND (:viewerId IS NULL OR NOT EXISTS (
                   SELECT 1 FROM HiddenItem h WHERE h.userId = :viewerId AND h.targetType = 'comment' AND h.targetId = c.id))

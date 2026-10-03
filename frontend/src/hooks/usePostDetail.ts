@@ -1,7 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
-import { fetchMoreChildren, fetchMyCommentVotes, fetchPostWithComments, postComment } from '../lib/commentApi';
+import {
+  deleteComment,
+  editComment,
+  fetchMoreChildren,
+  fetchMyCommentVotes,
+  fetchPostWithComments,
+  postComment,
+} from '../lib/commentApi';
 import { castVote, removeVote } from '../lib/feedApi';
+import { deletePost, editPost } from '../lib/postApi';
 import type { CommentNode, CommentSortType } from '../types/comment';
 import type { Post } from '../types/post';
 
@@ -42,6 +50,10 @@ interface UsePostDetailResult {
   applyCommentVote: (commentId: string, dir: 1 | -1) => void;
   submitComment: (parentId: string | null, body: string) => Promise<void>;
   loadMoreReplies: (parentId: string) => void;
+  editPostBody: (body: string) => Promise<void>;
+  removePost: () => Promise<void>;
+  editCommentBody: (commentId: string, body: string) => Promise<void>;
+  removeComment: (commentId: string) => Promise<void>;
 }
 
 export function usePostDetail(communityName: string, postId: string, sort: CommentSortType): UsePostDetailResult {
@@ -194,6 +206,83 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
     [comments, postId, sort, mergeMyVotes],
   );
 
+  // Optimistic body edit with rollback, same shape as applyPostVote. The server response is applied only for
+  // body and editedAt — a PostWithComments/CommentView response doesn't carry this client's loaded state
+  // (votes, reply subtree), so it's never merged in wholesale.
+  const editPostBody = useCallback(
+    async (body: string) => {
+      let previous: Post | null = null;
+      setPost((prev) => {
+        previous = prev;
+        return prev ? { ...prev, body } : prev;
+      });
+      try {
+        const saved = await editPost(communityName, postId, body);
+        setPost((prev) => (prev ? { ...prev, body: saved.body, editedAt: saved.editedAt } : prev));
+      } catch (err) {
+        if (previous) {
+          const snapshot: Post = previous;
+          setPost(snapshot);
+        }
+        throw err;
+      }
+    },
+    [communityName, postId],
+  );
+
+  // Not optimistic: content loss is irreversible, so the tombstone is only applied once the server confirms.
+  // Mirrors what the server wipes (see PostService.delete), so the page reflects it without a refetch.
+  const removePost = useCallback(async () => {
+    await deletePost(communityName, postId);
+    setPost((prev) =>
+      prev
+        ? {
+            ...prev,
+            deleted: true,
+            title: '[deleted]',
+            body: null,
+            url: null,
+            mediaId: null,
+            media: null,
+            mediaItems: null,
+            flairId: null,
+            flair: null,
+            pinned: false,
+            authorUsername: null,
+          }
+        : prev,
+    );
+  }, [communityName, postId]);
+
+  const editCommentBody = useCallback(async (commentId: string, body: string) => {
+    let previous: CommentNode | undefined;
+    setComments((prev) =>
+      updateNode(prev, commentId, (n) => {
+        previous = n;
+        return { ...n, body };
+      }),
+    );
+    try {
+      const saved = await editComment(commentId, body);
+      setComments((prev) =>
+        updateNode(prev, commentId, (n) => ({ ...n, body: saved.body, editedAt: saved.editedAt })),
+      );
+    } catch (err) {
+      if (previous) {
+        const snapshot = previous;
+        setComments((prev) => updateNode(prev, commentId, () => snapshot));
+      }
+      throw err;
+    }
+  }, []);
+
+  const removeComment = useCallback(async (commentId: string) => {
+    await deleteComment(commentId);
+    setComments((prev) =>
+      updateNode(prev, commentId, (n) => ({ ...n, deleted: true, body: '[deleted]', authorUsername: null })),
+    );
+  }, []);
+
   return {
     post,
     comments,
@@ -206,5 +295,9 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
     applyCommentVote,
     submitComment,
     loadMoreReplies,
+    editPostBody,
+    removePost,
+    editCommentBody,
+    removeComment,
   };
 }

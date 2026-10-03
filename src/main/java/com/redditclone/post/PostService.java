@@ -6,6 +6,7 @@ import com.redditclone.common.RankFormulas;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.VoteDelta;
 import com.redditclone.common.exception.BadRequestException;
+import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.common.text.Sanitizer;
 import com.redditclone.community.CommunityService;
@@ -214,6 +215,57 @@ public class PostService {
         posts.save(p);
     }
 
+    @Transactional
+    public Post editBody(UUID actorId, UUID communityId, UUID postId, String body) {
+        Post p = requireAuthoredPost(actorId, communityId, postId);
+        if (p.isDeleted()) {
+            throw new NotFoundException("post not found");
+        }
+        if (!"text".equals(p.getKind())) {
+            throw new BadRequestException("only text posts have an editable body");
+        }
+        p.setBody(sanitizer.sanitize(body));
+        p.setEditedAt(Instant.now());
+        posts.save(p);
+        return attachAll(p);
+    }
+
+    // Tombstones rather than hard-deleting: the row, its comment thread, and its ranking history stay so
+    // replies keep their place in the tree. Content is wiped here (not just hidden at read time) so nothing
+    // about a deleted post's text, link, or media stays retrievable through this API.
+    @Transactional
+    public void delete(UUID actorId, UUID communityId, UUID postId) {
+        Post p = requireAuthoredPost(actorId, communityId, postId);
+        if (p.isDeleted()) {
+            return;
+        }
+        p.setDeleted(true);
+        p.setTitle("[deleted]");
+        p.setBody(null);
+        p.setUrl(null);
+        p.setMediaId(null);
+        p.setFlairId(null);
+        p.setPinned(false);
+        posts.save(p);
+        postMedia.deleteByPostId(postId);
+    }
+
+    // Shared author gate for edit and delete (house style: MediaService.requireOwner). Moderator removal is
+    // final for the author — a removed post can't be edited or deleted by whoever wrote it.
+    private Post requireAuthoredPost(UUID actorId, UUID communityId, UUID postId) {
+        Post p = findById(postId);
+        if (!p.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("post not found");
+        }
+        if (!p.getAuthorId().equals(actorId)) {
+            throw new ForbiddenException("not the author of this post");
+        }
+        if (p.isRemoved()) {
+            throw new ForbiddenException("this post has been removed by moderators");
+        }
+        return p;
+    }
+
     // No permission check here — same convention as setFlair, ModerationController checks
     // PERM_MANAGE_POSTS before calling. Pinned posts deliberately don't fold into /new or /hot's sort
     // order (see the feature's plan) — findPinned below is the only place they're surfaced together.
@@ -241,7 +293,7 @@ public class PostService {
     }
 
     public List<Post> findPinned(UUID communityId) {
-        return attachAll(posts.findByCommunityIdAndPinnedTrueAndRemovedFalseOrderByCreatedAtDesc(communityId));
+        return attachAll(posts.findByCommunityIdAndPinnedTrueAndRemovedFalseAndDeletedFalseOrderByCreatedAtDesc(communityId));
     }
 
     // No pagination — a relevance ranking (ts_rank) isn't a stable keyset sort key the way created_at/
@@ -424,12 +476,15 @@ public class PostService {
         }
         Map<UUID, String> usernames = authService.findUsernamesByIds(authorIds);
         for (Post p : page) {
-            p.setAuthorUsername(usernames.get(p.getAuthorId()));
+            p.setAuthorUsername(p.isDeleted() ? null : usernames.get(p.getAuthorId()));
         }
         return page;
     }
 
     private Post attachAuthorUsername(Post p) {
+        if (p.isDeleted()) {
+            return p;
+        }
         p.setAuthorUsername(authService.findUsernamesByIds(Set.of(p.getAuthorId())).get(p.getAuthorId()));
         return p;
     }

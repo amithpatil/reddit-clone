@@ -70,6 +70,12 @@ public class Comment {
     @Column(nullable = false)
     private boolean removed;
 
+    @Column(nullable = false)
+    private boolean deleted;
+
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
@@ -175,6 +181,22 @@ public class Comment {
 
     public void setRemoved(boolean removed) {
         this.removed = removed;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
+    }
+
+    public Instant getEditedAt() {
+        return editedAt;
+    }
+
+    public void setEditedAt(Instant editedAt) {
+        this.editedAt = editedAt;
     }
 
     public Instant getCreatedAt() {

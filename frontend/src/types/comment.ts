@@ -14,6 +14,8 @@ export interface CommentNode {
   controversialRank: number;
   childCount: number;
   removed: boolean;
+  deleted: boolean;
+  editedAt: string | null;
   createdAt: string;
   replies: CommentNode[];
   // Non-null exactly when this node's own direct children were truncated (childCount exceeds

@@ -1,0 +1,61 @@
+.wrapper {
+  margin-top: var(--space-2);
+}
+
+.actions {
+  display: flex;
+  gap: var(--space-3);
+}
+
+.actionButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.actionButton:hover {
+  color: var(--color-text);
+}
+
+.actionButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.confirmRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  font-size: 12px;
+}
+
+.confirmText {
+  color: var(--color-text);
+}
+
+.dangerButton {
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: var(--color-text-on-primary);
+  padding: 2px var(--space-3);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dangerButton:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.error {
+  margin: var(--space-2) 0 0;
+  font-size: 12px;
+  color: var(--color-danger);
+}

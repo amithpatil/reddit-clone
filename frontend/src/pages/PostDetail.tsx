@@ -1,6 +1,9 @@
+import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../auth/AuthContext';
 import { CommentSortDropdown } from '../components/CommentSortDropdown';
 import { CommentThread } from '../components/CommentThread';
+import { OwnContentActions } from '../components/OwnContentActions';
 import { PostMedia } from '../components/PostMedia';
 import { ReplyBox } from '../components/ReplyBox';
 import { VoteControl } from '../components/VoteControl';
@@ -14,6 +17,8 @@ export function PostDetail() {
   const { communityName = '', postId = '' } = useParams();
   const [searchParams] = useSearchParams();
   const sort = (searchParams.get('commentSort') as CommentSortType) || 'best';
+  const { user } = useAuth();
+  const [editingPost, setEditingPost] = useState(false);
 
   const {
     post,
@@ -27,6 +32,10 @@ export function PostDetail() {
     applyCommentVote,
     submitComment,
     loadMoreReplies,
+    editPostBody,
+    removePost,
+    editCommentBody,
+    removeComment,
   } = usePostDetail(communityName, postId, sort);
 
   if (loading) {
@@ -55,20 +64,46 @@ export function PostDetail() {
               r/{post.communityName ?? 'unknown'}
             </Link>{' '}
             · {timeAgo(post.createdAt)}
+            {post.editedAt && !post.deleted && <> · edited</>}
           </div>
           <h1 className={styles.title}>
             {decodeHtmlEntities(post.title)}
             {post.nsfw && <span className={`${styles.badge} ${styles.badgeNsfw}`}>NSFW</span>}
             {post.spoiler && <span className={`${styles.badge} ${styles.badgeSpoiler}`}>Spoiler</span>}
           </h1>
-          <PostMedia post={post} fullBody />
+          {!post.deleted &&
+            (editingPost ? (
+              <ReplyBox
+                placeholder="Edit your post"
+                submitLabel="Save"
+                initialBody={post.body ?? ''}
+                onCancel={() => setEditingPost(false)}
+                onSubmit={async (body) => {
+                  await editPostBody(body);
+                  setEditingPost(false);
+                }}
+              />
+            ) : (
+              <PostMedia post={post} fullBody />
+            ))}
           <div className={styles.footer}>{post.commentCount} comments</div>
+          {user && !editingPost && (
+            <OwnContentActions
+              viewerId={user.id}
+              authorId={post.authorId}
+              removed={post.removed}
+              deleted={post.deleted}
+              canEdit={post.kind === 'text'}
+              onEdit={() => setEditingPost(true)}
+              onDelete={removePost}
+            />
+          )}
         </div>
       </article>
 
       <div className={styles.commentsSection}>
         <CommentSortDropdown />
-        <ReplyBox onSubmit={(body) => submitComment(null, body)} />
+        {!post.deleted && <ReplyBox onSubmit={(body) => submitComment(null, body)} />}
         {comments.length === 0 ? (
           <p>No comments yet. Be the first to share what you think!</p>
         ) : (
@@ -79,6 +114,9 @@ export function PostDetail() {
               onVote={applyCommentVote}
               onReply={submitComment}
               onLoadMoreReplies={loadMoreReplies}
+              onEdit={editCommentBody}
+              onDelete={removeComment}
+              readOnly={post.deleted}
             />
           ))
         )}

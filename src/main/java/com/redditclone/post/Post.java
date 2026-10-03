@@ -106,6 +106,14 @@ public class Post {
     @Column(nullable = false)
     private boolean removed;
 
+    // Author-initiated, distinct from `removed` (a moderator action): a deleted post keeps its row and
+    // comment thread as a "[deleted]" tombstone, and must never be unremovable by a moderator.
+    @Column(nullable = false)
+    private boolean deleted;
+
+    @Column(name = "edited_at")
+    private Instant editedAt;
+
     // search_vector is intentionally not mapped: it's populated by the V3 posts_search_vector_trigger
     // and unused until Phase 3 search. ddl-auto=validate only checks mapped columns, so leaving it out is safe.
 
@@ -313,6 +321,22 @@ public class Post {
 
     public void setRemoved(boolean removed) {
         this.removed = removed;
+    }
+
+    public boolean isDeleted() {
+        return deleted;
+    }
+
+    public void setDeleted(boolean deleted) {
+        this.deleted = deleted;
+    }
+
+    public Instant getEditedAt() {
+        return editedAt;
+    }
+
+    public void setEditedAt(Instant editedAt) {
+        this.editedAt = editedAt;
     }
 
     public Instant getCreatedAt() {

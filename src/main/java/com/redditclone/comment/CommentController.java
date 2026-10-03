@@ -1,6 +1,7 @@
 package com.redditclone.comment;
 
 import com.redditclone.comment.dto.CommentView;
+import com.redditclone.comment.dto.EditCommentRequest;
 import com.redditclone.comment.dto.PostWithCommentsView;
 import com.redditclone.comment.dto.ReplyRequest;
 import com.redditclone.comment.dto.UserCommentView;
@@ -13,7 +14,9 @@ import com.redditclone.community.CommunityService;
 import com.redditclone.post.PostService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -43,6 +46,17 @@ public class CommentController {
     @PostMapping("/api/comment")
     public Comment reply(@AuthenticationPrincipal UUID userId, @Valid @RequestBody ReplyRequest req) {
         return commentService.reply(userId, req.postId(), req.parentId(), req.body());
+    }
+
+    @PatchMapping("/api/comment/{commentId}")
+    public CommentView editComment(@AuthenticationPrincipal UUID userId, @PathVariable UUID commentId,
+                                    @Valid @RequestBody EditCommentRequest req) {
+        return commentService.editBody(userId, commentId, req.body());
+    }
+
+    @DeleteMapping("/api/comment/{commentId}")
+    public void deleteComment(@AuthenticationPrincipal UUID userId, @PathVariable UUID commentId) {
+        commentService.delete(userId, commentId);
     }
 
     @GetMapping("/r/{communityName}/comments/{postId}")

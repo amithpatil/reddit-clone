@@ -94,6 +94,9 @@ public class CommentService {
         if (post.isLocked()) {
             throw new ForbiddenException("this post is locked");
         }
+        if (post.isDeleted()) {
+            throw new NotFoundException("post not found");
+        }
         String sanitizedBody = sanitizer.sanitize(body);
         Comment c = new Comment();
         c.setId(ids.nextId());
@@ -111,6 +114,9 @@ public class CommentService {
                     .orElseThrow(() -> new NotFoundException("parent comment not found"));
             if (!parent.getPostId().equals(postId)) {
                 throw new BadRequestException("parent comment does not belong to this post");
+            }
+            if (parent.isDeleted()) {
+                throw new NotFoundException("parent comment not found");
             }
             if (parent.getDepth() >= MAX_DEPTH) {
                 throw new BadRequestException("max comment depth reached");
@@ -374,7 +380,7 @@ public class CommentService {
         }
         Map<UUID, String> usernames = authService.findUsernamesByIds(authorIds);
         for (Comment c : allComments) {
-            c.setAuthorUsername(usernames.get(c.getAuthorId()));
+            c.setAuthorUsername(c.isDeleted() ? null : usernames.get(c.getAuthorId()));
         }
     }
 
@@ -426,6 +432,43 @@ public class CommentService {
         Comment c = findById(commentId);
         c.setRemoved(true);
         comments.save(c);
+    }
+
+    @Transactional
+    public CommentView editBody(UUID actorId, UUID commentId, String body) {
+        Comment c = requireAuthoredComment(actorId, commentId);
+        if (c.isDeleted()) {
+            throw new NotFoundException("comment not found");
+        }
+        c.setBody(sanitizer.sanitize(body));
+        c.setEditedAt(Instant.now());
+        comments.save(c);
+        attachAuthorUsernames(List.of(c));
+        return CommentView.from(c);
+    }
+
+    // Wipes the body rather than only hiding it at read time, same as PostService.delete. The row, parentId,
+    // path, and childCount stay put — the reply subtree underneath must not lose its place in the ltree.
+    @Transactional
+    public void delete(UUID actorId, UUID commentId) {
+        Comment c = requireAuthoredComment(actorId, commentId);
+        if (c.isDeleted()) {
+            return;
+        }
+        c.setDeleted(true);
+        c.setBody("[deleted]");
+        comments.save(c);
+    }
+
+    private Comment requireAuthoredComment(UUID actorId, UUID commentId) {
+        Comment c = findById(commentId);
+        if (!c.getAuthorId().equals(actorId)) {
+            throw new ForbiddenException("not the author of this comment");
+        }
+        if (c.isRemoved()) {
+            throw new ForbiddenException("this comment has been removed by moderators");
+        }
+        return c;
     }
 
     // Applies a batch of grouped vote deltas (one entry per comment touched, not per vote — see

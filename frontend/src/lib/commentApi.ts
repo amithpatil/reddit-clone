@@ -23,6 +23,16 @@ export function postComment(postId: string, parentId: string | null, body: strin
   return api.post('/api/comment', { postId, parentId, body });
 }
 
+// The response is a full CommentView, including replies — callers must only take body/editedAt from it,
+// never replace the node wholesale, or its already-loaded reply subtree would be wiped.
+export function editComment(commentId: string, body: string): Promise<CommentNode> {
+  return api.patch(`/api/comment/${commentId}`, { body }) as Promise<CommentNode>;
+}
+
+export function deleteComment(commentId: string): Promise<unknown> {
+  return api.del(`/api/comment/${commentId}`);
+}
+
 // GET /api/morechildren — the next page of one specific comment's direct children (not deeper), for the
 // "N more replies" affordance CommentThread shows when childCount exceeds replies.length.
 export function fetchMoreChildren(

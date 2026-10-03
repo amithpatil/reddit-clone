@@ -10,12 +10,15 @@ import com.redditclone.common.paging.Thing;
 import com.redditclone.community.CommunityService;
 import com.redditclone.community.Flair;
 import com.redditclone.post.dto.CreatePostRequest;
+import com.redditclone.post.dto.EditPostRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -57,6 +60,20 @@ public class PostController {
                         @RequestHeader("Idempotency-Key") String idempotencyKey) {
         UUID communityId = communityService.findByName(communityName).getId();
         return postService.create(userId, communityId, req, idempotencyKey);
+    }
+
+    @PatchMapping("/posts/{postId}")
+    public Post editPost(@AuthenticationPrincipal UUID userId, @PathVariable String communityName,
+                          @PathVariable UUID postId, @Valid @RequestBody EditPostRequest req) {
+        UUID communityId = communityService.findByName(communityName).getId();
+        return postService.editBody(userId, communityId, postId, req.body());
+    }
+
+    @DeleteMapping("/posts/{postId}")
+    public void deletePost(@AuthenticationPrincipal UUID userId, @PathVariable String communityName,
+                            @PathVariable UUID postId) {
+        UUID communityId = communityService.findByName(communityName).getId();
+        postService.delete(userId, communityId, postId);
     }
 
     @GetMapping("/new")

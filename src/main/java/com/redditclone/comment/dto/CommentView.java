@@ -19,8 +19,8 @@ import java.util.UUID;
 // response, never minted client-side).
 public record CommentView(UUID id, UUID postId, UUID parentId, String path, short depth, UUID authorId,
                            String authorUsername, String body, int score, int ups, int downs, double bestRank,
-                           double controversialRank, int childCount, boolean removed, Instant createdAt,
-                           List<CommentView> replies, String repliesAfter) {
+                           double controversialRank, int childCount, boolean removed, boolean deleted,
+                           Instant editedAt, Instant createdAt, List<CommentView> replies, String repliesAfter) {
 
     public static CommentView from(Comment c) {
         return from(c, List.of(), null);
@@ -34,6 +34,6 @@ public record CommentView(UUID id, UUID postId, UUID parentId, String path, shor
         return new CommentView(c.getId(), c.getPostId(), c.getParentId(), c.getPath(), c.getDepth(),
                 c.getAuthorId(), c.getAuthorUsername(), c.isRemoved() ? "[removed]" : c.getBody(), c.getScore(),
                 c.getUps(), c.getDowns(), c.getBestRank(), c.getControversialRank(), c.getChildCount(),
-                c.isRemoved(), c.getCreatedAt(), replies, repliesAfter);
+                c.isRemoved(), c.isDeleted(), c.getEditedAt(), c.getCreatedAt(), replies, repliesAfter);
     }
 }

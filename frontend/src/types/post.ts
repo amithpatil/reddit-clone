@@ -46,6 +46,11 @@ export interface Post {
   controversialRank: number;
   pinned: boolean;
   locked: boolean;
+  removed: boolean;
+  // Author-initiated tombstone: the backend has already wiped title/body/media, so the UI only needs to
+  // hide author actions and skip the media renderer for these.
+  deleted: boolean;
+  editedAt: string | null;
   createdAt: string;
   // Never sent by the backend on the feed response itself — merged in client-side from a separate
   // GET /api/vote/mine call (see useFeed), because the vote module can't attach it to Post without
