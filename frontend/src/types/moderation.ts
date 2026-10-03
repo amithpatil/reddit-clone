@@ -9,6 +9,7 @@ export const PERM_MANAGE_FLAIRS = 1 << 5;
 export const PERM_MANAGE_POSTS = 1 << 6;
 export const PERM_MANAGE_RULES = 1 << 7;
 export const PERM_MANAGE_ACCESS = 1 << 8;
+export const PERM_MANAGE_SETTINGS = 1 << 9;
 
 // true for the owner's Integer.MAX_VALUE (every bit set) on every single bit, same as the backend's own
 // (permissions & requiredBit) == requiredBit check (CommunityService.hasModPermission).

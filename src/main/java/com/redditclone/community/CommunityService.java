@@ -222,6 +222,10 @@ public class CommunityService {
     @Transactional
     public void addModerator(UUID actorId, UUID communityId, UUID targetUserId, int permissions) {
         requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_MODERATORS);
+        Community community = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        if (targetUserId.equals(community.getCreatorId())) {
+            throw new BadRequestException("cannot change the creator's moderator row");
+        }
         // Cap the grant to a subset of the actor's own permissions — otherwise a moderator who only holds
         // PERM_MANAGE_MODERATORS could grant themselves (or anyone) OWNER_PERMISSIONS.
         int grantorPermissions = moderators.findByCommunityIdAndUserId(communityId, actorId)
@@ -468,6 +472,14 @@ public class CommunityService {
     // Whole-list replace, not individual add/remove/reorder — a rules list is edited as one small ordered
     // unit in practice (max 15 entries), so index-addressed CRUD here would be meaningfully more code for
     // no real benefit.
+    @Transactional
+    public void updateDescription(UUID actorId, UUID communityId, String description) {
+        requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_SETTINGS);
+        Community c = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
+        c.setDescription(description);
+        communities.save(c);
+    }
+
     @Transactional
     public void setRules(UUID actorId, UUID communityId, List<CommunityRule> rules) {
         requirePermission(actorId, communityId, CommunityModerator.PERM_MANAGE_RULES);

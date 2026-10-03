@@ -38,6 +38,10 @@ export function fetchJoinRequests(communityName: string): Promise<JoinRequestEnt
   return api.get(`/r/${communityName}/mod/join-requests`) as Promise<JoinRequestEntry[]>;
 }
 
+export function updateCommunityDescription(communityName: string, description: string): Promise<{ description: string | null }> {
+  return api.patch(`/r/${communityName}/mod/settings`, { description }) as Promise<{ description: string | null }>;
+}
+
 export function approveJoinRequest(communityName: string, userId: string): Promise<unknown> {
   return api.post(`/r/${communityName}/mod/join-requests/${userId}/approve`);
 }

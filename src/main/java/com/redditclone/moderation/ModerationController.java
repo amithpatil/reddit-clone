@@ -10,6 +10,7 @@ import com.redditclone.community.dto.ApprovedSubmitterRequest;
 import com.redditclone.community.dto.SetCommunityTypeRequest;
 import com.redditclone.community.dto.SetFlairRequest;
 import com.redditclone.community.dto.SetRulesRequest;
+import com.redditclone.community.dto.UpdateDescriptionRequest;
 import com.redditclone.moderation.dto.AddModeratorRequest;
 import com.redditclone.moderation.dto.AutomodRuleRequest;
 import com.redditclone.moderation.dto.BanRequest;
@@ -33,7 +34,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.ObjectMapper;
 
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -178,6 +181,14 @@ public class ModerationController {
     public void setRules(@AuthenticationPrincipal UUID userId, @PathVariable String name,
                           @Valid @RequestBody SetRulesRequest req) {
         communityService.setRules(userId, communityId(name), req.rules());
+    }
+
+    // communityService.updateDescription checks PERM_MANAGE_SETTINGS internally, same convention as setRules.
+    @PatchMapping("/r/{name}/mod/settings")
+    public Map<String, String> updateSettings(@AuthenticationPrincipal UUID userId, @PathVariable String name,
+                                               @Valid @RequestBody UpdateDescriptionRequest req) {
+        communityService.updateDescription(userId, communityId(name), req.description());
+        return Collections.singletonMap("description", req.description());
     }
 
     @PatchMapping("/r/{name}/mod/users/{targetUserId}/flair")

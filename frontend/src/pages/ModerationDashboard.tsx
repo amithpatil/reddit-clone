@@ -4,12 +4,19 @@ import { AutomodTab } from '../components/AutomodTab';
 import { BansTab } from '../components/BansTab';
 import { JoinRequestsTab } from '../components/JoinRequestsTab';
 import { ModQueueTab } from '../components/ModQueueTab';
+import { SettingsTab } from '../components/SettingsTab';
 import { fetchCommunityAbout } from '../lib/communityApi';
-import { hasPermission, PERM_BAN_USERS, PERM_MANAGE_ACCESS, PERM_MANAGE_AUTOMOD } from '../types/moderation';
+import {
+  hasPermission,
+  PERM_BAN_USERS,
+  PERM_MANAGE_ACCESS,
+  PERM_MANAGE_AUTOMOD,
+  PERM_MANAGE_SETTINGS,
+} from '../types/moderation';
 import type { Community } from '../types/community';
 import styles from './ModerationDashboard.module.css';
 
-type Tab = 'queue' | 'bans' | 'join-requests' | 'automod';
+type Tab = 'queue' | 'bans' | 'join-requests' | 'automod' | 'settings';
 
 export function ModerationDashboard() {
   const { communityName = '' } = useParams();
@@ -62,10 +69,16 @@ export function ModerationDashboard() {
   const canSeeBans = hasPermission(community.myPermissions, PERM_BAN_USERS);
   const canSeeJoinRequests = hasPermission(community.myPermissions, PERM_MANAGE_ACCESS);
   const canManageAutomod = hasPermission(community.myPermissions, PERM_MANAGE_AUTOMOD);
+  const canManageSettings = hasPermission(community.myPermissions, PERM_MANAGE_SETTINGS);
 
   // Tabs a capped moderator lacks the view permission for simply aren't offered — the backend itself
   // 403s the underlying list for the exact same bit, so this isn't just cosmetic.
-  const activeTab: Tab = (tab === 'bans' && !canSeeBans) || (tab === 'join-requests' && !canSeeJoinRequests) ? 'queue' : tab;
+  const activeTab: Tab =
+    (tab === 'bans' && !canSeeBans) ||
+    (tab === 'join-requests' && !canSeeJoinRequests) ||
+    (tab === 'settings' && !canManageSettings)
+      ? 'queue'
+      : tab;
 
   return (
     <div className={styles.page}>
@@ -91,12 +104,24 @@ export function ModerationDashboard() {
         <button type="button" className={`${styles.tab} ${activeTab === 'automod' ? styles.tabActive : ''}`} onClick={() => setTab('automod')}>
           Automod
         </button>
+        {canManageSettings && (
+          <button type="button" className={`${styles.tab} ${activeTab === 'settings' ? styles.tabActive : ''}`} onClick={() => setTab('settings')}>
+            Settings
+          </button>
+        )}
       </div>
 
       {activeTab === 'queue' && <ModQueueTab communityName={communityName} myPermissions={community.myPermissions} />}
       {activeTab === 'bans' && canSeeBans && <BansTab communityName={communityName} />}
       {activeTab === 'join-requests' && canSeeJoinRequests && <JoinRequestsTab communityName={communityName} />}
       {activeTab === 'automod' && <AutomodTab communityName={communityName} canManage={canManageAutomod} />}
+      {activeTab === 'settings' && canManageSettings && (
+        <SettingsTab
+          communityName={communityName}
+          initialDescription={community.description}
+          onSaved={(description) => setCommunity((prev) => (prev ? { ...prev, description } : prev))}
+        />
+      )}
     </div>
   );
 }
