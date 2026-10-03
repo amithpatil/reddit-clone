@@ -5,10 +5,12 @@ import com.redditclone.comment.CommentService;
 import com.redditclone.common.KarmaEvent;
 import com.redditclone.common.UuidV7Generator;
 import com.redditclone.common.VoteDelta;
+import com.redditclone.common.correlation.CorrelationIdFilter;
 import com.redditclone.post.PostService;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -57,7 +59,7 @@ public class OutboxWorker {
         // compatible with any future non-notification event type, which still falls through to the
         // existing "unrecognized" warning below exactly as before.
         List<Map<String, Object>> events = jdbc.queryForList("""
-                SELECT id, event_type, payload FROM outbox_events
+                SELECT id, event_type, payload, correlation_id FROM outbox_events
                 WHERE processed_at IS NULL AND event_type <> 'notification'
                 ORDER BY id
                 LIMIT %d
@@ -79,6 +81,14 @@ public class OutboxWorker {
         // left for the operator to investigate instead of blocking the rest of the queue.
         for (Map<String, Object> event : events) {
             String type = (String) event.get("event_type");
+            // Re-applies the originating request's correlation id (persisted on the row by
+            // OutboxWriter.writeEvent) before this row's own log lines — guards the put with a null check
+            // since MDC.put rejects a null value, and clears per row (not just per tick) in the finally
+            // since a 500-row batch can span many different original requests.
+            String correlationId = (String) event.get("correlation_id");
+            if (correlationId != null) {
+                MDC.put(CorrelationIdFilter.MDC_KEY, correlationId);
+            }
             try {
                 if (type.startsWith("post_vote") || type.startsWith("comment_vote")) {
                     VoteEventPayload payload = parsePayload(event.get("payload").toString());
@@ -88,11 +98,14 @@ public class OutboxWorker {
                     } else {
                         accumulate(commentAgg, payload.targetId(), delta);
                     }
+                    log.info("outbox event {} ({}) applied", event.get("id"), type);
                 } else {
                     log.warn("outbox event {} has unrecognized event_type '{}', marking processed without applying it", event.get("id"), type);
                 }
             } catch (Exception e) {
                 log.warn("outbox event {} could not be applied, marking processed without applying it: {}", event.get("id"), e.getMessage());
+            } finally {
+                MDC.remove(CorrelationIdFilter.MDC_KEY);
             }
         }
 

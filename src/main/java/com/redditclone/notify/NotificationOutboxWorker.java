@@ -3,9 +3,11 @@ package com.redditclone.notify;
 import com.redditclone.auth.AuthService;
 import com.redditclone.common.OutboxWriter;
 import com.redditclone.common.UuidV7Generator;
+import com.redditclone.common.correlation.CorrelationIdFilter;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -51,7 +53,7 @@ public class NotificationOutboxWorker {
     @Transactional
     public void processBatch() {
         List<Map<String, Object>> events = jdbc.queryForList("""
-                SELECT id, payload FROM outbox_events
+                SELECT id, payload, correlation_id FROM outbox_events
                 WHERE processed_at IS NULL AND event_type = 'notification'
                 ORDER BY id
                 LIMIT %d
@@ -63,6 +65,13 @@ public class NotificationOutboxWorker {
 
         List<Object[]> rows = new ArrayList<>();
         for (Map<String, Object> event : events) {
+            // Re-applies the originating request's/STOMP-send's correlation id (persisted on the row by
+            // OutboxWriter.writeEvent, including from ChatStompHandler.send) before this row's own log
+            // lines — see OutboxWorker's identical comment for why the null guard and per-row clear matter.
+            String correlationId = (String) event.get("correlation_id");
+            if (correlationId != null) {
+                MDC.put(CorrelationIdFilter.MDC_KEY, correlationId);
+            }
             try {
                 JsonNode payload = json.readTree(event.get("payload").toString());
                 UUID userId = UUID.fromString(payload.path("userId").asString());
@@ -74,9 +83,14 @@ public class NotificationOutboxWorker {
                 // either way, same as the existing "unrecognized event_type" skip-and-continue elsewhere.
                 if (authService.wantsNotification(userId, type)) {
                     rows.add(new Object[]{ids.nextId(), userId, type, json.writeValueAsString(payload.path("source"))});
+                    log.info("outbox event {} ({}) queued for insertion", event.get("id"), type);
+                } else {
+                    log.info("outbox event {} ({}) skipped (muted)", event.get("id"), type);
                 }
             } catch (Exception e) {
                 log.warn("outbox event {} could not be applied, marking processed without applying it: {}", event.get("id"), e.getMessage());
+            } finally {
+                MDC.remove(CorrelationIdFilter.MDC_KEY);
             }
         }
 

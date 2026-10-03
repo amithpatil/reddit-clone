@@ -1,10 +1,12 @@
 package com.redditclone.media;
 
 import com.redditclone.common.UuidV7Generator;
+import com.redditclone.common.correlation.CorrelationIdFilter;
 import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.ForbiddenException;
 import com.redditclone.common.exception.NotFoundException;
 import com.redditclone.media.dto.UploadUrlResponse;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -83,6 +85,7 @@ public class MediaService {
         m.setContentType(contentType);
         m.setByteSize(byteSize);
         m.setProcessingStatus("pending");
+        m.setCorrelationId(MDC.get(CorrelationIdFilter.MDC_KEY));
         media.save(m);
 
         return new UploadUrlResponse(id, uploadUrl);
@@ -209,7 +212,7 @@ public class MediaService {
                     LIMIT ?
                     FOR UPDATE SKIP LOCKED
                 )
-                RETURNING id, owner_id, media_type, r2_key, content_type, byte_size, attempt_count
+                RETURNING id, owner_id, media_type, r2_key, content_type, byte_size, attempt_count, correlation_id
                 """, (rs, rowNum) -> new ClaimedMedia(
                         (UUID) rs.getObject("id"),
                         (UUID) rs.getObject("owner_id"),
@@ -217,7 +220,8 @@ public class MediaService {
                         rs.getString("r2_key"),
                         rs.getString("content_type"),
                         rs.getLong("byte_size"),
-                        rs.getInt("attempt_count")),
+                        rs.getInt("attempt_count"),
+                        rs.getString("correlation_id")),
                 mediaType, batchSize);
     }
 

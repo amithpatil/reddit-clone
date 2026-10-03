@@ -1,9 +1,11 @@
 package com.redditclone.media;
 
+import com.redditclone.common.correlation.CorrelationIdFilter;
 import net.coobird.thumbnailator.Thumbnails;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -37,11 +39,20 @@ public class ImageProcessingWorker {
     public void processBatch() {
         List<ClaimedMedia> batch = mediaService.claimUploadedBatch("image", BATCH_SIZE);
         for (ClaimedMedia claimed : batch) {
+            // Re-applies the original upload request's correlation id (see Media.correlationId) — this
+            // worker runs inline on the shared @Scheduled thread, so without this, its log lines would
+            // carry whatever the previous unrelated job's tick last left in MDC.
+            if (claimed.correlationId() != null) {
+                MDC.put(CorrelationIdFilter.MDC_KEY, claimed.correlationId());
+            }
             try {
                 process(claimed);
+                log.info("image media {} processed", claimed.id());
             } catch (Exception e) {
                 log.warn("image processing failed for media {}: {}", claimed.id(), e.getMessage());
                 mediaService.markFailedOrRetry(claimed.id(), e.getMessage());
+            } finally {
+                MDC.remove(CorrelationIdFilter.MDC_KEY);
             }
         }
     }

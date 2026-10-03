@@ -1,6 +1,14 @@
 server:
   port: 8081   # 8080 is occupied by an unrelated process on this machine
 
+logging:
+  pattern:
+    # %X{correlationId}: CorrelationIdFilter (and the async workers it hands off to) populate this MDC key
+    # per request/job-tick — not Spring Boot's own built-in %correlationId/LOG_CORRELATION_PATTERN hook,
+    # which is wired to Micrometer Tracing's traceId/spanId specifically, a heavier dependency this app
+    # doesn't use.
+    console: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [%X{correlationId}] [%15.15t] %-40.40logger{39} : %m%n%wEx"
+
 spring:
   application:
     name: reddit-clone

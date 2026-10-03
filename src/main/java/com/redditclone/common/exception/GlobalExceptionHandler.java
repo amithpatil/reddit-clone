@@ -1,5 +1,7 @@
 package com.redditclone.common.exception;
 
+import com.redditclone.common.correlation.CorrelationIdFilter;
+import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -62,11 +64,16 @@ public class GlobalExceptionHandler {
     }
 
     private ResponseEntity<Object> body(HttpStatus status, String message) {
+        String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
         return ResponseEntity.status(status).body(Map.of(
                 "timestamp", Instant.now().toString(),
                 "status", status.value(),
                 "error", status.getReasonPhrase(),
-                "message", message == null ? "" : message
+                "message", message == null ? "" : message,
+                // A concrete reference id the client/user can quote when reporting a bug — see
+                // CorrelationIdFilter. Falls back to "" the same way message does, for a caller outside
+                // the filter's reach (e.g. a direct unit test of this handler).
+                "correlationId", correlationId == null ? "" : correlationId
         ));
     }
 }

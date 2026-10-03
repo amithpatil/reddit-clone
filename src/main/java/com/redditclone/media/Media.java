@@ -56,6 +56,12 @@ public class Media {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 
+    // Captured from MDC at upload-request time (see CorrelationIdFilter / MediaService.requestUploadUrl) —
+    // persisted so ImageProcessingWorker/VideoProcessingWorker can re-apply it on their own, later thread
+    // when this row is eventually processed, long after the original request's own MDC is gone.
+    @Column(name = "correlation_id")
+    private String correlationId;
+
     public UUID getId() {
         return id;
     }
@@ -170,5 +176,13 @@ public class Media {
 
     public Instant getCreatedAt() {
         return createdAt;
+    }
+
+    public String getCorrelationId() {
+        return correlationId;
+    }
+
+    public void setCorrelationId(String correlationId) {
+        this.correlationId = correlationId;
     }
 }

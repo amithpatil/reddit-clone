@@ -1,14 +1,17 @@
 package com.redditclone.job;
 
+import com.redditclone.common.correlation.CorrelationIdFilter;
 import io.micrometer.core.instrument.MeterRegistry;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -40,24 +43,33 @@ public class ReconciliationJob {
     @SchedulerLock(name = "reconciliationJob", lockAtLeastFor = "1m", lockAtMostFor = "30m")
     @Transactional
     public void run() {
-        // Vote rows pointing at a deleted target are safe to clean up outright — a vote has no content of its own.
-        int orphanPostVotes = jdbc.update("""
-                DELETE FROM post_votes pv WHERE NOT EXISTS (SELECT 1 FROM posts p WHERE p.id = pv.post_id)
-                """);
-        int orphanCommentVotes = jdbc.update("""
-                DELETE FROM comment_votes cv WHERE NOT EXISTS (SELECT 1 FROM comments c WHERE c.id = cv.comment_id)
-                """);
-        // A comment pointing at a missing post is a real anomaly (it carries content and moderation history),
-        // so this only counts and alerts — a human decides what happened, nothing is auto-deleted.
-        Long orphanComments = jdbc.queryForObject("""
-                SELECT count(*) FROM comments c WHERE NOT EXISTS (SELECT 1 FROM posts p WHERE p.id = c.post_id)
-                """, Long.class);
+        // Not tied to any request — mints its own per-run id purely so this thread's MDC state is sane
+        // both during this run (for its own log line below) and afterward: this shares the single default
+        // @Scheduled thread with every request-correlated worker in the app (OutboxWorker etc.), and a
+        // forgotten clear anywhere would otherwise leak a stale id into whichever job runs next.
+        MDC.put(CorrelationIdFilter.MDC_KEY, "job-" + UUID.randomUUID());
+        try {
+            // Vote rows pointing at a deleted target are safe to clean up outright — a vote has no content of its own.
+            int orphanPostVotes = jdbc.update("""
+                    DELETE FROM post_votes pv WHERE NOT EXISTS (SELECT 1 FROM posts p WHERE p.id = pv.post_id)
+                    """);
+            int orphanCommentVotes = jdbc.update("""
+                    DELETE FROM comment_votes cv WHERE NOT EXISTS (SELECT 1 FROM comments c WHERE c.id = cv.comment_id)
+                    """);
+            // A comment pointing at a missing post is a real anomaly (it carries content and moderation history),
+            // so this only counts and alerts — a human decides what happened, nothing is auto-deleted.
+            Long orphanComments = jdbc.queryForObject("""
+                    SELECT count(*) FROM comments c WHERE NOT EXISTS (SELECT 1 FROM posts p WHERE p.id = c.post_id)
+                    """, Long.class);
 
-        orphanPostVotesGauge.set(orphanPostVotes);
-        orphanCommentVotesGauge.set(orphanCommentVotes);
-        orphanCommentsGauge.set(orphanComments == null ? 0 : orphanComments);
-        if (orphanComments != null && orphanComments > 0) {
-            log.warn("reconciliation: {} comments reference a missing post — investigate before trusting the soft-delete invariant again", orphanComments);
+            orphanPostVotesGauge.set(orphanPostVotes);
+            orphanCommentVotesGauge.set(orphanCommentVotes);
+            orphanCommentsGauge.set(orphanComments == null ? 0 : orphanComments);
+            if (orphanComments != null && orphanComments > 0) {
+                log.warn("reconciliation: {} comments reference a missing post — investigate before trusting the soft-delete invariant again", orphanComments);
+            }
+        } finally {
+            MDC.remove(CorrelationIdFilter.MDC_KEY);
         }
     }
 }

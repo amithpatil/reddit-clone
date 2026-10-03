@@ -1,5 +1,7 @@
 package com.redditclone.common;
 
+import com.redditclone.common.correlation.CorrelationIdFilter;
+import org.slf4j.MDC;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
@@ -28,22 +30,27 @@ public class OutboxWriter {
 
     // payload is Object, not Map<String,Object>, so this also accepts a typed record (e.g. vote's
     // VoteEventPayload) — Jackson serializes a record's components the same way it does a map's entries.
+    // correlation_id is captured from MDC at write time (the HTTP/STOMP thread that produced this event) —
+    // by the time a worker drains this row later on its own thread, the original request's MDC is long
+    // gone, so it must be persisted with the row to survive that hop. See CorrelationIdFilter.
     public void writeEvent(String eventType, Object payload) {
-        jdbc.update("INSERT INTO outbox_events (id, event_type, payload) VALUES (?, ?, ?::jsonb)",
-                ids.nextId(), eventType, json.writeValueAsString(payload));
+        jdbc.update("INSERT INTO outbox_events (id, event_type, payload, correlation_id) VALUES (?, ?, ?::jsonb, ?)",
+                ids.nextId(), eventType, json.writeValueAsString(payload), MDC.get(CorrelationIdFilter.MDC_KEY));
     }
 
     // Batched counterpart to writeEvent, for a caller that already has several same-type events ready at
     // once (e.g. several distinct u/{username} mentions in one comment) — one round trip instead of one
-    // insert per event.
+    // insert per event. All events in one call share the same correlation id (they're all produced by the
+    // same request).
     public void writeEvents(String eventType, List<?> payloads) {
         if (payloads.isEmpty()) {
             return;
         }
+        String correlationId = MDC.get(CorrelationIdFilter.MDC_KEY);
         List<Object[]> rows = payloads.stream()
-                .map(payload -> new Object[]{ids.nextId(), eventType, json.writeValueAsString(payload)})
+                .map(payload -> new Object[]{ids.nextId(), eventType, json.writeValueAsString(payload), correlationId})
                 .toList();
-        jdbc.batchUpdate("INSERT INTO outbox_events (id, event_type, payload) VALUES (?, ?, ?::jsonb)", rows);
+        jdbc.batchUpdate("INSERT INTO outbox_events (id, event_type, payload, correlation_id) VALUES (?, ?, ?::jsonb, ?)", rows);
     }
 
     // Runs in its own transaction (REQUIRES_NEW), separate from whatever transaction the caller is

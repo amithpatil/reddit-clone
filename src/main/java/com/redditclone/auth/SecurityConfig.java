@@ -1,5 +1,6 @@
 package com.redditclone.auth;
 
+import com.redditclone.common.correlation.CorrelationIdFilter;
 import jakarta.servlet.DispatcherType;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -42,7 +43,11 @@ public class SecurityConfig {
         // Content-Type, a browser blocks the actual request client-side if a custom header isn't
         // explicitly allowed here, even when the preflight itself responds 200 — found by actually
         // submitting a post from the browser, not just curling the endpoint directly.
-        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+        config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key", CorrelationIdFilter.HEADER));
+        // Without this, browser JS can never read a custom response header regardless of the allow-rule
+        // above — allowedHeaders governs the request direction, exposedHeaders governs the response
+        // direction, and no exposedHeaders call existed in this app before the correlation-id filter.
+        config.setExposedHeaders(List.of(CorrelationIdFilter.HEADER));
         config.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
@@ -51,6 +56,7 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http, JwtAuthFilter jwtFilter,
+                                            CorrelationIdFilter correlationIdFilter,
                                             CorsConfigurationSource corsConfigurationSource) throws Exception {
         http.csrf(csrf -> csrf.disable()) // bearer-token API, not cookie-session based
                 .cors(cors -> cors.configurationSource(corsConfigurationSource))
@@ -85,7 +91,10 @@ public class SecurityConfig {
                         // at the first STOMP frame (see ChatWebSocketConfig's inbound-channel interceptor).
                         .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
+                // First filter in the whole chain: wraps everything, including auth failures, so every
+                // response (success or error) is taggable back to the same id.
+                .addFilterBefore(correlationIdFilter, JwtAuthFilter.class);
         return http.build();
     }
 }

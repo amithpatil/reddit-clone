@@ -1,8 +1,10 @@
 package com.redditclone.media;
 
+import com.redditclone.common.correlation.CorrelationIdFilter;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -47,11 +49,20 @@ public class VideoProcessingWorker {
         List<ClaimedMedia> batch = mediaService.claimUploadedBatch("video", BATCH_SIZE);
         for (ClaimedMedia claimed : batch) {
             transcodeExecutor.submit(() -> {
+                // MDC is ThreadLocal — it does NOT cross the scheduler-thread -> video-transcode-pool-
+                // thread hop this submit() performs, so the id has to be re-applied here, on the actual
+                // worker thread, not on the dispatching thread above.
+                if (claimed.correlationId() != null) {
+                    MDC.put(CorrelationIdFilter.MDC_KEY, claimed.correlationId());
+                }
                 try {
                     process(claimed);
+                    log.info("video media {} processed", claimed.id());
                 } catch (Exception e) {
                     log.warn("video processing failed for media {}: {}", claimed.id(), e.getMessage());
                     mediaService.markFailedOrRetry(claimed.id(), e.getMessage());
+                } finally {
+                    MDC.remove(CorrelationIdFilter.MDC_KEY);
                 }
             });
         }
