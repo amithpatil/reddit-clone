@@ -226,13 +226,18 @@ public class PostService {
         }
         p.setBody(sanitizer.sanitize(body));
         p.setEditedAt(Instant.now());
+        if (communityService.evaluateAutomod(p.getCommunityId(), "post", postId, p.getTitle(), p.getBody(),
+                authService.getKarmaPost(actorId))) {
+            p.setRemoved(true);
+        }
         posts.save(p);
         return attachAll(p);
     }
 
     // Tombstones rather than hard-deleting: the row, its comment thread, and its ranking history stay so
-    // replies keep their place in the tree. Content is wiped here (not just hidden at read time) so nothing
-    // about a deleted post's text, link, or media stays retrievable through this API.
+    // replies keep their place in the tree. Content is wiped here (not just hidden at read time). Two
+    // leaks remain by design: the anonymous /hot page cache (FeedCacheService, 45s TTL) can serve the
+    // original title, body and media until it expires, and deleted media objects stay at their public URLs.
     @Transactional
     public void delete(UUID actorId, UUID communityId, UUID postId) {
         Post p = requireAuthoredPost(actorId, communityId, postId);
@@ -263,6 +268,8 @@ public class PostService {
         if (p.isRemoved()) {
             throw new ForbiddenException("this post has been removed by moderators");
         }
+        communityService.requireNotBanned(actorId, communityId);
+        communityService.requirePostAccess(actorId, communityId);
         return p;
     }
 
@@ -273,6 +280,9 @@ public class PostService {
     public void setPinned(UUID postId, UUID communityId, boolean pinned) {
         Post p = findById(postId);
         if (!p.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("post not found");
+        }
+        if (p.isDeleted()) {
             throw new NotFoundException("post not found");
         }
         if (pinned && posts.countByCommunityIdAndPinnedTrue(communityId) >= maxPinnedPosts) {
@@ -526,6 +536,9 @@ public class PostService {
     public void setFlair(UUID postId, UUID communityId, UUID flairId) {
         Post p = findById(postId);
         if (!p.getCommunityId().equals(communityId)) {
+            throw new NotFoundException("post not found");
+        }
+        if (p.isDeleted()) {
             throw new NotFoundException("post not found");
         }
         if (flairId != null) {

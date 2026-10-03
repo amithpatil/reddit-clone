@@ -442,6 +442,11 @@ public class CommentService {
         }
         c.setBody(sanitizer.sanitize(body));
         c.setEditedAt(Instant.now());
+        Post post = postService.findById(c.getPostId());
+        if (communityService.evaluateAutomod(post.getCommunityId(), "comment", c.getId(), null, c.getBody(),
+                authService.getKarmaComment(actorId))) {
+            c.setRemoved(true);
+        }
         comments.save(c);
         attachAuthorUsernames(List.of(c));
         return CommentView.from(c);
@@ -468,6 +473,12 @@ public class CommentService {
         if (c.isRemoved()) {
             throw new ForbiddenException("this comment has been removed by moderators");
         }
+        Post post = postService.findById(c.getPostId());
+        if (post.isDeleted()) {
+            throw new NotFoundException("comment not found");
+        }
+        communityService.requireNotBanned(actorId, post.getCommunityId());
+        communityService.requireViewAccess(actorId, post.getCommunityId());
         return c;
     }
 

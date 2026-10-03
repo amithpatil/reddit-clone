@@ -76,7 +76,7 @@ export function PostDetail() {
               <ReplyBox
                 placeholder="Edit your post"
                 submitLabel="Save"
-                initialBody={post.body ?? ''}
+                initialBody={decodeHtmlEntities(post.body ?? '')}
                 onCancel={() => setEditingPost(false)}
                 onSubmit={async (body) => {
                   await editPostBody(body);

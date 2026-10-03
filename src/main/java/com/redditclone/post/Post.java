@@ -7,6 +7,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Transient;
+import jakarta.persistence.Version;
 
 import java.time.Instant;
 import java.util.List;
@@ -110,6 +111,11 @@ public class Post {
     // comment thread as a "[deleted]" tombstone, and must never be unremovable by a moderator.
     @Column(nullable = false)
     private boolean deleted;
+
+    // Full-row saves from a stale snapshot must fail, not silently rewrite columns a concurrent
+    // moderator removal or author delete already changed.
+    @Version
+    private int version;
 
     @Column(name = "edited_at")
     private Instant editedAt;

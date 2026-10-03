@@ -56,7 +56,8 @@ export function useGalleryUpload(): UseGalleryUploadResult {
       }
       const toAdd: GalleryItem[] = [];
       let rejected = false;
-      for (const file of Array.from(files).slice(0, room)) {
+      let overflow = false;
+      for (const file of Array.from(files)) {
         if (!IMAGE_TYPES.has(file.type)) {
           rejected = true;
           continue;
@@ -64,6 +65,10 @@ export function useGalleryUpload(): UseGalleryUploadResult {
         if (file.size > MAX_IMAGE_BYTES) {
           rejected = true;
           continue;
+        }
+        if (toAdd.length >= room) {
+          overflow = true;
+          break;
         }
         toAdd.push({
           id: crypto.randomUUID(),
@@ -74,7 +79,7 @@ export function useGalleryUpload(): UseGalleryUploadResult {
           error: null,
         });
       }
-      if (Array.from(files).length > room) {
+      if (overflow) {
         setError(`A gallery can have at most ${MAX_ITEMS} images — only the first ${room} were added.`);
       } else if (rejected) {
         setError('Some files were skipped (gallery images must be JPEG, PNG, or WebP).');

@@ -233,6 +233,11 @@ public class CommunityService {
         if ((permissions & ~grantorPermissions) != 0) {
             throw new ForbiddenException("cannot grant permissions beyond your own");
         }
+        int targetPermissions = moderators.findByCommunityIdAndUserId(communityId, targetUserId)
+                .map(CommunityModerator::getPermissions).orElse(0);
+        if ((targetPermissions & ~grantorPermissions) != 0) {
+            throw new ForbiddenException("cannot change a moderator who holds permissions beyond your own");
+        }
         CommunityModerator mod = new CommunityModerator(communityId, targetUserId, permissions, actorId);
         // Re-adding an existing moderator re-issues this row via JPA merge — preserve the original
         // added_at instead of letting merge overwrite it with the new instance's Instant.now() default.
@@ -247,6 +252,13 @@ public class CommunityService {
         Community community = communities.findById(communityId).orElseThrow(() -> new NotFoundException("no such community"));
         if (targetUserId.equals(community.getCreatorId())) {
             throw new ForbiddenException("cannot remove the community's owner");
+        }
+        int grantorPermissions = moderators.findByCommunityIdAndUserId(communityId, actorId)
+                .map(CommunityModerator::getPermissions).orElse(0);
+        int targetPermissions = moderators.findByCommunityIdAndUserId(communityId, targetUserId)
+                .map(CommunityModerator::getPermissions).orElse(0);
+        if ((targetPermissions & ~grantorPermissions) != 0) {
+            throw new ForbiddenException("cannot remove a moderator who holds permissions beyond your own");
         }
         moderators.deleteByCommunityIdAndUserId(communityId, targetUserId);
     }

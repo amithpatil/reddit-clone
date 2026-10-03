@@ -238,6 +238,7 @@ expect_eq "the post row is tombstoned: deleted, title wiped, body/url/media/pin 
   "$(psql_c "SELECT deleted || '|' || title || '|' || (body IS NULL) || '|' || (url IS NULL) || '|' || (media_id IS NULL) || '|' || pinned FROM posts WHERE id='$P_DEL'")"
 
 req GET "/r/$COMM/new" ""
+expect_status "the community /new listing responds" "200" "$HTTP_STATUS" "-"
 if echo "$HTTP_BODY" | jq -e --arg id "$P_DEL" '.data.children[] | select(.data.id == $id)' >/dev/null; then
   record FAIL "the deleted post drops out of the community's /new listing" "still present"
 else
@@ -245,6 +246,7 @@ else
 fi
 
 req GET "/user/$OWNER_NAME/submitted" ""
+expect_status "the owner's submitted tab responds" "200" "$HTTP_STATUS" "-"
 if echo "$HTTP_BODY" | jq -e --arg id "$P_DEL" '.data.children[] | select(.data.id == $id)' >/dev/null; then
   record FAIL "the deleted post drops out of the author's submitted tab" "still present"
 else
@@ -270,7 +272,7 @@ HOT_GONE=0
 WAITED=0
 while [ "$WAITED" -lt "$HOT_WAIT_SECONDS" ]; do
   req GET "/r/$COMM/hot" ""
-  if ! echo "$HTTP_BODY" | jq -e --arg id "$P_DEL" '.data.children[] | select(.data.id == $id)' >/dev/null 2>&1; then
+  if [ "$HTTP_STATUS" = "200" ] && ! echo "$HTTP_BODY" | jq -e --arg id "$P_DEL" '.data.children[] | select(.data.id == $id)' >/dev/null 2>&1; then
     HOT_GONE=1
     break
   fi

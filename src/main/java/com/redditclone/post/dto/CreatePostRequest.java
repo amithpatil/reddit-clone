@@ -3,6 +3,7 @@ package com.redditclone.post.dto;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
@@ -15,7 +16,7 @@ public record CreatePostRequest(
         @Size(max = 40000) String body,
         String url,
         UUID mediaId,
-        @Size(max = 20) List<UUID> mediaIds,
+        @Size(max = 20) List<@NotNull UUID> mediaIds,
         UUID flairId,
         Boolean nsfw,
         Boolean spoiler

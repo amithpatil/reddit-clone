@@ -211,23 +211,17 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
   // (votes, reply subtree), so it's never merged in wholesale.
   const editPostBody = useCallback(
     async (body: string) => {
-      let previous: Post | null = null;
-      setPost((prev) => {
-        previous = prev;
-        return prev ? { ...prev, body } : prev;
-      });
+      const previousBody = post?.body ?? null;
+      setPost((prev) => (prev ? { ...prev, body } : prev));
       try {
         const saved = await editPost(communityName, postId, body);
         setPost((prev) => (prev ? { ...prev, body: saved.body, editedAt: saved.editedAt } : prev));
       } catch (err) {
-        if (previous) {
-          const snapshot: Post = previous;
-          setPost(snapshot);
-        }
+        setPost((prev) => (prev ? { ...prev, body: previousBody } : prev));
         throw err;
       }
     },
-    [communityName, postId],
+    [communityName, postId, post],
   );
 
   // Not optimistic: content loss is irreversible, so the tombstone is only applied once the server confirms.
@@ -254,27 +248,24 @@ export function usePostDetail(communityName: string, postId: string, sort: Comme
     );
   }, [communityName, postId]);
 
-  const editCommentBody = useCallback(async (commentId: string, body: string) => {
-    let previous: CommentNode | undefined;
-    setComments((prev) =>
-      updateNode(prev, commentId, (n) => {
-        previous = n;
-        return { ...n, body };
-      }),
-    );
-    try {
-      const saved = await editComment(commentId, body);
-      setComments((prev) =>
-        updateNode(prev, commentId, (n) => ({ ...n, body: saved.body, editedAt: saved.editedAt })),
-      );
-    } catch (err) {
-      if (previous) {
-        const snapshot = previous;
-        setComments((prev) => updateNode(prev, commentId, () => snapshot));
+  const editCommentBody = useCallback(
+    async (commentId: string, body: string) => {
+      const previousBody = findNode(comments, commentId)?.body;
+      setComments((prev) => updateNode(prev, commentId, (n) => ({ ...n, body })));
+      try {
+        const saved = await editComment(commentId, body);
+        setComments((prev) =>
+          updateNode(prev, commentId, (n) => ({ ...n, body: saved.body, editedAt: saved.editedAt })),
+        );
+      } catch (err) {
+        if (previousBody !== undefined) {
+          setComments((prev) => updateNode(prev, commentId, (n) => ({ ...n, body: previousBody })));
+        }
+        throw err;
       }
-      throw err;
-    }
-  }, []);
+    },
+    [comments],
+  );
 
   const removeComment = useCallback(async (commentId: string) => {
     await deleteComment(commentId);

@@ -3,6 +3,7 @@ package com.redditclone.common.exception;
 import com.redditclone.common.correlation.CorrelationIdFilter;
 import org.slf4j.MDC;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -61,6 +62,11 @@ public class GlobalExceptionHandler {
             return body(HttpStatus.CONFLICT, "resource already exists");
         }
         return body(HttpStatus.BAD_REQUEST, "invalid request");
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<Object> handleOptimisticLock(OptimisticLockingFailureException ex) {
+        return body(HttpStatus.CONFLICT, "this changed while you were editing it — reload and try again");
     }
 
     private ResponseEntity<Object> body(HttpStatus status, String message) {

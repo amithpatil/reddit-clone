@@ -65,7 +65,7 @@ export function CommentThread({ comment, onVote, onReply, onLoadMoreReplies, onE
             <ReplyBox
               placeholder="Edit your comment"
               submitLabel="Save"
-              initialBody={comment.body}
+              initialBody={decodeHtmlEntities(comment.body)}
               onCancel={() => setEditing(false)}
               onSubmit={handleEdit}
             />

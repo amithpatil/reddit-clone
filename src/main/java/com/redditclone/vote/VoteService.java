@@ -4,6 +4,8 @@ import com.redditclone.comment.CommentService;
 import com.redditclone.common.OutboxWriter;
 import com.redditclone.common.exception.BadRequestException;
 import com.redditclone.common.exception.NotFoundException;
+import com.redditclone.comment.Comment;
+import com.redditclone.post.Post;
 import com.redditclone.post.PostService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -39,7 +41,10 @@ public class VoteService {
     @Transactional
     public void castPostVote(UUID userId, UUID postId, short direction) {
         requireDirection(direction);
-        postService.findById(postId); // 404s on a nonexistent/removed post instead of creating an orphan vote
+        Post post = postService.findById(postId); // 404s on a nonexistent post instead of creating an orphan vote
+        if (post.isDeleted() || post.isRemoved()) {
+            throw new NotFoundException("post not found");
+        }
         lockVoteKey("post", userId, postId);
         Optional<PostVote> existing = postVotes.findById(new PostVoteId(userId, postId));
         if (existing.isPresent() && existing.get().getDirection() == direction) {
@@ -62,7 +67,10 @@ public class VoteService {
     @Transactional
     public void castCommentVote(UUID userId, UUID commentId, short direction) {
         requireDirection(direction);
-        commentService.findById(commentId); // 404s on a nonexistent/removed comment instead of creating an orphan vote
+        Comment comment = commentService.findById(commentId); // 404s on a nonexistent comment instead of creating an orphan vote
+        if (comment.isDeleted() || comment.isRemoved()) {
+            throw new NotFoundException("comment not found");
+        }
         lockVoteKey("comment", userId, commentId);
         Optional<CommentVote> existing = commentVotes.findById(new CommentVoteId(userId, commentId));
         if (existing.isPresent() && existing.get().getDirection() == direction) {
